@@ -87,6 +87,48 @@ const schemas = {
       .messages({
         'string.empty': 'Le nom personnalisé est requis (peut être vide)'
       })
+  }),
+  
+  createConversation: Joi.object({
+    participantId: Joi.string().optional(),
+    participants: Joi.array().items(Joi.string()).optional(),
+    isGroup: Joi.boolean().optional(),
+    groupName: Joi.string().trim().max(100).optional(),
+    groupDescription: Joi.string().max(500).allow('').optional()
+  }),
+  
+  sendMessage: Joi.object({
+    conversationId: Joi.string().required()
+      .messages({
+        'string.empty': 'L\'ID de conversation est requis'
+      }),
+    content: Joi.string().allow('').optional(),
+    type: Joi.string().valid('text', 'image', 'video', 'file', 'audio').optional(),
+    replyTo: Joi.string().optional()
+  }),
+  
+  editMessage: Joi.object({
+    content: Joi.string().required()
+      .messages({
+        'string.empty': 'Le contenu est requis'
+      })
+  }),
+  
+  addReaction: Joi.object({
+    emoji: Joi.string().required()
+      .messages({
+        'string.empty': 'L\'emoji est requis'
+      })
+  }),
+  
+  updateNotifications: Joi.object({
+    muted: Joi.boolean().optional(),
+    mutedUntil: Joi.date().optional()
+  }),
+  
+  updateGroupInfo: Joi.object({
+    groupName: Joi.string().trim().max(100).optional(),
+    groupDescription: Joi.string().max(500).allow('').optional()
   })
 };
 

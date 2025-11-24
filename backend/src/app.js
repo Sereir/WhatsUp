@@ -60,7 +60,9 @@ app.get('/', (req, res) => {
       auth: '/api/auth',
       users: '/api/users',
       contacts: '/api/contacts',
-      sessions: '/api/sessions'
+      sessions: '/api/sessions',
+      conversations: '/api/conversations',
+      messages: '/api/messages'
     }
   });
 });
@@ -70,6 +72,8 @@ app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/users', require('./routes/user.routes'));
 app.use('/api/contacts', require('./routes/contact.routes'));
 app.use('/api/sessions', require('./routes/session.routes'));
+app.use('/api/conversations', require('./routes/conversation.routes'));
+app.use('/api/messages', require('./routes/message.routes'));
 
 // Gestion des routes non trouvées
 app.use((req, res) => {

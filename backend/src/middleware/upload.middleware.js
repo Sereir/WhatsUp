@@ -19,8 +19,8 @@ const storage = multer.diskStorage({
   }
 });
 
-// Filtre pour n'accepter que les images
-const fileFilter = (req, file, cb) => {
+// Filtre pour n'accepter que les images (avatars)
+const imageFilter = (req, file, cb) => {
   const allowedTypes = /jpeg|jpg|png|gif|webp/;
   const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
   const mimetype = allowedTypes.test(file.mimetype);
@@ -32,15 +32,45 @@ const fileFilter = (req, file, cb) => {
   }
 };
 
-// Configuration de multer
-const upload = multer({
+// Filtre pour tous types de média (messages)
+const mediaFilter = (req, file, cb) => {
+  const allowedTypes = /jpeg|jpg|png|gif|webp|mp4|mov|avi|mp3|wav|pdf|doc|docx|txt|zip/;
+  const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
+  
+  if (extname) {
+    return cb(null, true);
+  } else {
+    cb(new Error('Type de fichier non autorisé'));
+  }
+};
+
+// Configuration de multer pour avatars
+const uploadAvatar = multer({
   storage: storage,
   limits: {
     fileSize: 5 * 1024 * 1024 // 5MB max
   },
-  fileFilter: fileFilter
+  fileFilter: imageFilter
+});
+
+// Configuration de multer pour médias de messages
+const uploadMedia = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, 'media-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: {
+    fileSize: 50 * 1024 * 1024 // 50MB max pour les médias
+  },
+  fileFilter: mediaFilter
 });
 
 module.exports = {
-  uploadAvatar: upload.single('avatar')
+  uploadAvatar: uploadAvatar.single('avatar'),
+  uploadMedia: uploadMedia.single('file')
 };

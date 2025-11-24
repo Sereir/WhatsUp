@@ -1,0 +1,391 @@
+const Message = require('../models/Message');
+const Conversation = require('../models/Conversation');
+const logger = require('../utils/logger');
+const path = require('path');
+const fs = require('fs').promises;
+
+/**
+ * Envoyer un message
+ */
+const sendMessage = async (req, res, next) => {
+  try {
+    const { conversationId, content, type, replyTo } = req.body;
+    const userId = req.user._id;
+    
+    // Vérifier que la conversation existe
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation non trouvée'
+      });
+    }
+    
+    // Vérifier que l'utilisateur est participant
+    if (!conversation.isParticipant(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'êtes pas participant de cette conversation'
+      });
+    }
+    
+    // Créer le message
+    const messageData = {
+      conversation: conversationId,
+      sender: userId,
+      content,
+      type: type || 'text',
+      status: 'sent'
+    };
+    
+    if (replyTo) {
+      messageData.replyTo = replyTo;
+    }
+    
+    // Gérer les fichiers média si présents
+    if (req.file) {
+      messageData.mediaUrl = `/uploads/${req.file.filename}`;
+      messageData.mediaSize = req.file.size;
+      messageData.fileName = req.file.originalname;
+      messageData.mimeType = req.file.mimetype;
+    }
+    
+    const message = await Message.create(messageData);
+    
+    // Mettre à jour la conversation
+    conversation.lastMessage = message._id;
+    conversation.lastMessageAt = new Date();
+    
+    // Incrémenter le compteur de non lus pour tous les participants sauf l'expéditeur
+    for (const participantId of conversation.participants) {
+      if (participantId.toString() !== userId.toString()) {
+        await conversation.incrementUnread(participantId);
+      }
+    }
+    
+    await conversation.save();
+    
+    // Populate pour la réponse
+    await message.populate('sender', 'firstName lastName avatar');
+    if (replyTo) {
+      await message.populate('replyTo', 'content sender type');
+    }
+    
+    logger.info(`Message envoyé dans conversation ${conversationId} par ${req.user.email}`);
+    
+    res.status(201).json({
+      success: true,
+      message: 'Message envoyé',
+      data: { message }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur sendMessage:', error);
+    next(error);
+  }
+};
+
+/**
+ * Obtenir les messages d'une conversation
+ */
+const getMessages = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user._id;
+    const { limit, skip, before } = req.query;
+    
+    // Vérifier l'accès à la conversation
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Conversation non trouvée'
+      });
+    }
+    
+    if (!conversation.isParticipant(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès non autorisé'
+      });
+    }
+    
+    const options = {
+      limit: parseInt(limit) || 50,
+      skip: parseInt(skip) || 0,
+      before
+    };
+    
+    const messages = await Message.getConversationMessages(conversationId, userId, options);
+    
+    res.json({
+      success: true,
+      data: {
+        messages: messages.reverse(), // Retourner dans l'ordre chronologique
+        total: messages.length
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur getMessages:', error);
+    next(error);
+  }
+};
+
+/**
+ * Éditer un message
+ */
+const editMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const { content } = req.body;
+    const userId = req.user._id;
+    
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    // Vérifier que l'utilisateur est l'expéditeur
+    if (message.sender.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez éditer que vos propres messages'
+      });
+    }
+    
+    // Vérifier que le message est de type texte
+    if (message.type !== 'text') {
+      return res.status(400).json({
+        success: false,
+        message: 'Seuls les messages texte peuvent être édités'
+      });
+    }
+    
+    // Vérifier que le message n'est pas déjà supprimé
+    if (message.isDeleted) {
+      return res.status(400).json({
+        success: false,
+        message: 'Impossible d\'éditer un message supprimé'
+      });
+    }
+    
+    await message.editContent(content);
+    
+    logger.info(`Message ${messageId} édité par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Message édité',
+      data: { message }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur editMessage:', error);
+    next(error);
+  }
+};
+
+/**
+ * Supprimer un message
+ */
+const deleteMessage = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const { deleteForEveryone } = req.body;
+    const userId = req.user._id;
+    
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    // Vérifier que l'utilisateur est l'expéditeur
+    if (message.sender.toString() !== userId.toString()) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous ne pouvez supprimer que vos propres messages'
+      });
+    }
+    
+    if (deleteForEveryone) {
+      // Vérifier que le message a moins de 1 heure (optionnel)
+      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
+      if (message.createdAt < oneHourAgo) {
+        return res.status(400).json({
+          success: false,
+          message: 'Vous ne pouvez supprimer pour tout le monde que les messages de moins d\'1 heure'
+        });
+      }
+      
+      await message.deleteForEveryone();
+      logger.info(`Message ${messageId} supprimé pour tout le monde par ${req.user.email}`);
+    } else {
+      await message.deleteForUser(userId);
+      logger.info(`Message ${messageId} supprimé pour ${req.user.email}`);
+    }
+    
+    res.json({
+      success: true,
+      message: deleteForEveryone ? 'Message supprimé pour tout le monde' : 'Message supprimé pour vous'
+    });
+    
+  } catch (error) {
+    logger.error('Erreur deleteMessage:', error);
+    next(error);
+  }
+};
+
+/**
+ * Marquer un message comme lu
+ */
+const markMessageAsRead = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+    
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    await message.markAsRead(userId);
+    
+    res.json({
+      success: true,
+      message: 'Message marqué comme lu'
+    });
+    
+  } catch (error) {
+    logger.error('Erreur markMessageAsRead:', error);
+    next(error);
+  }
+};
+
+/**
+ * Marquer un message comme livré
+ */
+const markMessageAsDelivered = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+    
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    await message.markAsDelivered(userId);
+    
+    res.json({
+      success: true,
+      message: 'Message marqué comme livré'
+    });
+    
+  } catch (error) {
+    logger.error('Erreur markMessageAsDelivered:', error);
+    next(error);
+  }
+};
+
+/**
+ * Ajouter une réaction à un message
+ */
+const addReaction = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const { emoji } = req.body;
+    const userId = req.user._id;
+    
+    if (!emoji) {
+      return res.status(400).json({
+        success: false,
+        message: 'L\'emoji est requis'
+      });
+    }
+    
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    await message.addReaction(userId, emoji);
+    
+    logger.info(`Réaction ajoutée au message ${messageId} par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Réaction ajoutée',
+      data: { message }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur addReaction:', error);
+    next(error);
+  }
+};
+
+/**
+ * Retirer une réaction d'un message
+ */
+const removeReaction = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+    
+    const message = await Message.findById(messageId);
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    await message.removeReaction(userId);
+    
+    logger.info(`Réaction retirée du message ${messageId} par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Réaction retirée'
+    });
+    
+  } catch (error) {
+    logger.error('Erreur removeReaction:', error);
+    next(error);
+  }
+};
+
+module.exports = {
+  sendMessage,
+  getMessages,
+  editMessage,
+  deleteMessage,
+  markMessageAsRead,
+  markMessageAsDelivered,
+  addReaction,
+  removeReaction
+};
