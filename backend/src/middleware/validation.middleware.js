@@ -72,6 +72,21 @@ const schemas = {
       .messages({
         'any.only': 'Le statut doit être: online, offline ou away'
       })
+  }),
+  
+  addContact: Joi.object({
+    contactId: Joi.string().required()
+      .messages({
+        'string.empty': 'L\'ID du contact est requis'
+      }),
+    customName: Joi.string().trim().max(50).optional()
+  }),
+  
+  updateContactName: Joi.object({
+    customName: Joi.string().trim().max(50).allow('').required()
+      .messages({
+        'string.empty': 'Le nom personnalisé est requis (peut être vide)'
+      })
   })
 };
 

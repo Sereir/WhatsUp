@@ -58,7 +58,9 @@ app.get('/', (req, res) => {
     endpoints: {
       health: '/health',
       auth: '/api/auth',
-      users: '/api/users'
+      users: '/api/users',
+      contacts: '/api/contacts',
+      sessions: '/api/sessions'
     }
   });
 });
@@ -66,6 +68,8 @@ app.get('/', (req, res) => {
 // Routes API
 app.use('/api/auth', require('./routes/auth.routes'));
 app.use('/api/users', require('./routes/user.routes'));
+app.use('/api/contacts', require('./routes/contact.routes'));
+app.use('/api/sessions', require('./routes/session.routes'));
 
 // Gestion des routes non trouvées
 app.use((req, res) => {

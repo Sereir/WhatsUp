@@ -1,5 +1,7 @@
 const User = require('../models/User');
 const { generateToken } = require('../config/jwt');
+const { createSession } = require('./sessionController');
+const Session = require('../models/Session');
 const logger = require('../utils/logger');
 
 /**
@@ -89,6 +91,9 @@ const login = async (req, res, next) => {
     // Générer le token
     const token = generateToken(user._id);
     
+    // Créer une session
+    const session = await createSession(user._id, req);
+    
     logger.info(`Utilisateur connecté: ${email}`);
     
     res.json({
@@ -104,7 +109,8 @@ const login = async (req, res, next) => {
           bio: user.bio,
           status: user.status
         },
-        token
+        token,
+        sessionId: session._id
       }
     });
     
@@ -123,6 +129,12 @@ const logout = async (req, res, next) => {
     req.user.status = 'offline';
     req.user.lastSeen = new Date();
     await req.user.save();
+    
+    // Révoquer toutes les sessions actives
+    await Session.updateMany(
+      { user: req.user._id, isActive: true },
+      { isActive: false }
+    );
     
     logger.info(`Utilisateur déconnecté: ${req.user.email}`);
     
