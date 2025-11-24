@@ -1,9 +1,12 @@
 const express = require('express');
 const cors = require('cors');
+const helmet = require('helmet');
+const mongoSanitize = require('express-mongo-sanitize');
 require('dotenv').config();
 
 const logger = require('./utils/logger');
 const { initSentry, Sentry } = require('./config/sentry');
+const { apiLimiter } = require('./middleware/rateLimiter.middleware');
 
 // Initialiser Sentry AVANT Express
 initSentry();
@@ -16,14 +19,22 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
   app.use(Sentry.Handlers.tracingHandler());
 }
 
-// Middlewares de base
+// Sécurité
+app.use(helmet());
 app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
   credentials: true
 }));
 
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Parsing
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// Sanitization MongoDB
+app.use(mongoSanitize());
+
+// Rate limiting global
+app.use('/api/', apiLimiter);
 
 // Servir les fichiers statiques (uploads)
 app.use('/uploads', express.static(process.env.UPLOAD_PATH || './uploads'));
@@ -45,10 +56,16 @@ app.get('/', (req, res) => {
     message: 'Bienvenue sur l\'API WhatsUp !',
     version: '1.0.0',
     endpoints: {
-      health: '/health'
+      health: '/health',
+      auth: '/api/auth',
+      users: '/api/users'
     }
   });
 });
+
+// Routes API
+app.use('/api/auth', require('./routes/auth.routes'));
+app.use('/api/users', require('./routes/user.routes'));
 
 // Gestion des routes non trouvées
 app.use((req, res) => {
