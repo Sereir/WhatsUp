@@ -9,11 +9,11 @@ const PORT = process.env.PORT || 3000;
 const startServer = async () => {
   try {
     // 1. Connexion � MongoDB
-    await connectDB();
+    await connectDB(); 
     
     // 2. D�marrer le serveur
     const server = app.listen(PORT, () => {
-      logger.info('Serveur d�marr� sur le port ' + PORT);
+      logger.info('Serveur d�marr� sur le port  ' + PORT);
       logger.info('Environnement: ' + (process.env.NODE_ENV || 'development'));
       console.log('\n Serveur d�marr� sur le port ' + PORT);
       console.log(' URL: http://localhost:' + PORT);
