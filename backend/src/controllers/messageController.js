@@ -3,6 +3,7 @@ const Conversation = require('../models/Conversation');
 const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
+const { processMediaFile, deleteMediaFile } = require('../utils/mediaProcessor');
 
 /**
  * Envoyer un message
@@ -45,10 +46,12 @@ const sendMessage = async (req, res, next) => {
     
     // Gérer les fichiers média si présents
     if (req.file) {
-      messageData.mediaUrl = `/uploads/${req.file.filename}`;
-      messageData.mediaSize = req.file.size;
-      messageData.fileName = req.file.originalname;
-      messageData.mimeType = req.file.mimetype;
+      const mediaInfo = await processMediaFile(req.file);
+      messageData.mediaUrl = mediaInfo.url;
+      messageData.mediaSize = mediaInfo.size;
+      messageData.fileName = mediaInfo.fileName;
+      messageData.mimeType = mediaInfo.mimeType;
+      messageData.thumbnailUrl = mediaInfo.thumbnailUrl;
     }
     
     const message = await Message.create(messageData);
@@ -228,6 +231,11 @@ const deleteMessage = async (req, res, next) => {
         });
       }
       
+      // Supprimer le fichier média si présent
+      if (message.mediaUrl) {
+        await deleteMediaFile(message.mediaUrl);
+      }
+      
       await message.deleteForEveryone();
       logger.info(`Message ${messageId} supprimé pour tout le monde par ${req.user.email}`);
     } else {
@@ -379,6 +387,132 @@ const removeReaction = async (req, res, next) => {
   }
 };
 
+/**
+ * Rechercher des messages
+ */
+const searchMessages = async (req, res, next) => {
+  try {
+    const userId = req.user._id;
+    const { q, conversationId, senderId, limit, skip } = req.query;
+    
+    if (!q || q.length < 2) {
+      return res.status(400).json({
+        success: false,
+        message: 'La recherche doit contenir au moins 2 caractères'
+      });
+    }
+    
+    // Construire la requête
+    const query = {
+      isDeleted: false,
+      $or: [
+        { content: { $regex: q, $options: 'i' } },
+        { fileName: { $regex: q, $options: 'i' } }
+      ]
+    };
+    
+    // Filtrer par conversation si spécifiée
+    if (conversationId) {
+      const conversation = await Conversation.findById(conversationId);
+      if (!conversation || !conversation.isParticipant(userId)) {
+        return res.status(403).json({
+          success: false,
+          message: 'Accès non autorisé à cette conversation'
+        });
+      }
+      query.conversation = conversationId;
+    } else {
+      // Sinon, chercher dans toutes les conversations de l'utilisateur
+      const userConversations = await Conversation.find({
+        participants: userId
+      }).select('_id');
+      
+      query.conversation = { $in: userConversations.map(c => c._id) };
+    }
+    
+    // Filtrer par expéditeur si spécifié
+    if (senderId) {
+      query.sender = senderId;
+    }
+    
+    const messages = await Message.find(query)
+      .populate('sender', 'firstName lastName avatar')
+      .populate('conversation', 'participants isGroup groupName')
+      .sort({ createdAt: -1 })
+      .limit(parseInt(limit) || 20)
+      .skip(parseInt(skip) || 0);
+    
+    res.json({
+      success: true,
+      data: {
+        messages,
+        total: messages.length,
+        query: q
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur searchMessages:', error);
+    next(error);
+  }
+};
+
+/**
+ * Télécharger un fichier
+ */
+const downloadFile = async (req, res, next) => {
+  try {
+    const { messageId } = req.params;
+    const userId = req.user._id;
+    
+    const message = await Message.findById(messageId).populate('conversation');
+    
+    if (!message) {
+      return res.status(404).json({
+        success: false,
+        message: 'Message non trouvé'
+      });
+    }
+    
+    // Vérifier l'accès
+    if (!message.conversation.isParticipant(userId)) {
+      return res.status(403).json({
+        success: false,
+        message: 'Accès non autorisé'
+      });
+    }
+    
+    if (!message.mediaUrl) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ce message ne contient pas de fichier'
+      });
+    }
+    
+    const filePath = path.join(
+      process.env.UPLOAD_PATH || './uploads',
+      path.basename(message.mediaUrl)
+    );
+    
+    // Vérifier que le fichier existe
+    try {
+      await fs.access(filePath);
+    } catch (err) {
+      return res.status(404).json({
+        success: false,
+        message: 'Fichier non trouvé sur le serveur'
+      });
+    }
+    
+    // Télécharger le fichier
+    res.download(filePath, message.fileName || path.basename(filePath));
+    
+  } catch (error) {
+    logger.error('Erreur downloadFile:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   sendMessage,
   getMessages,
@@ -387,5 +521,7 @@ module.exports = {
   markMessageAsRead,
   markMessageAsDelivered,
   addReaction,
-  removeReaction
+  removeReaction,
+  searchMessages,
+  downloadFile
 };

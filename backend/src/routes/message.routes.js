@@ -16,6 +16,18 @@ router.use(authMiddleware);
 router.post('/', uploadMedia, validate(schemas.sendMessage), messageController.sendMessage);
 
 /**
+ * @route   GET /api/messages/search
+ * @desc    Rechercher des messages
+ * @query   ?q=terme (requis)
+ * @query   ?conversationId=id (optionnel)
+ * @query   ?senderId=id (optionnel)
+ * @query   ?limit=20 (optionnel)
+ * @query   ?skip=0 (optionnel)
+ * @access  Private
+ */
+router.get('/search', messageController.searchMessages);
+
+/**
  * @route   GET /api/messages/:conversationId
  * @desc    Obtenir les messages d'une conversation
  * @query   ?limit=50 (optionnel)
@@ -66,5 +78,12 @@ router.post('/:messageId/reaction', validate(schemas.addReaction), messageContro
  * @access  Private
  */
 router.delete('/:messageId/reaction', messageController.removeReaction);
+
+/**
+ * @route   GET /api/messages/:messageId/download
+ * @desc    Télécharger le fichier d'un message
+ * @access  Private
+ */
+router.get('/:messageId/download', messageController.downloadFile);
 
 module.exports = router;

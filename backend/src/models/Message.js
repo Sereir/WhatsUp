@@ -13,7 +13,9 @@ const messageSchema = new mongoose.Schema({
   sender: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
-    required: true,
+    required: function() {
+      return this.type !== 'system';
+    },
     index: true
   },
   content: {
@@ -24,7 +26,7 @@ const messageSchema = new mongoose.Schema({
   },
   type: {
     type: String,
-    enum: ['text', 'image', 'video', 'file', 'audio'],
+    enum: ['text', 'image', 'video', 'file', 'audio', 'system'],
     default: 'text',
     required: true
   },
@@ -264,6 +266,19 @@ messageSchema.methods.addReaction = function(userId, emoji) {
 messageSchema.methods.removeReaction = function(userId) {
   this.reactions = this.reactions.filter(r => r.user.toString() !== userId.toString());
   return this.save();
+};
+
+/**
+ * Méthode statique pour créer un message système
+ */
+messageSchema.statics.createSystemMessage = async function(conversationId, content) {
+  return this.create({
+    conversation: conversationId,
+    sender: null,
+    content,
+    type: 'system',
+    status: 'sent'
+  });
 };
 
 module.exports = mongoose.model('Message', messageSchema);

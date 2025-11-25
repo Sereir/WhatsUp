@@ -43,6 +43,12 @@ const createConversation = async (req, res, next) => {
       await conversation.populate('participants', 'firstName lastName email avatar status');
       await conversation.populate('creator', 'firstName lastName');
       
+      // Créer un message système
+      await Message.createSystemMessage(
+        conversation._id,
+        `${req.user.firstName} ${req.user.lastName} a créé le groupe "${groupName}"`
+      );
+      
       logger.info(`Groupe créé: ${groupName} par ${req.user.email}`);
       
       return res.status(201).json({

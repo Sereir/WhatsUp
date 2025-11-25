@@ -103,7 +103,7 @@ const schemas = {
         'string.empty': 'L\'ID de conversation est requis'
       }),
     content: Joi.string().allow('').optional(),
-    type: Joi.string().valid('text', 'image', 'video', 'file', 'audio').optional(),
+    type: Joi.string().valid('text', 'image', 'video', 'file', 'audio', 'system').optional(),
     replyTo: Joi.string().optional()
   }),
   
