@@ -33,15 +33,11 @@
           />
         </div>
 
-        <div class="flex items-center justify-between">
+        <div class="flex items-center">
           <label class="flex items-center">
             <input v-model="remember" type="checkbox" class="h-4 w-4 text-primary focus:ring-primary border-gray-300 rounded">
             <span class="ml-2 text-sm text-gray-700">Se souvenir de moi</span>
           </label>
-          
-          <router-link to="/forgot" class="text-sm text-primary hover:text-secondary">
-            Mot de passe oublié ?
-          </router-link>
         </div>
 
         <button type="submit" class="btn-primary w-full">
