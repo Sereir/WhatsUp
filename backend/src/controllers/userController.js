@@ -7,6 +7,59 @@ const SecurityAlertService = require('../services/securityAlertService');
 const { addBreadcrumb } = require('../config/sentry');
 
 /**
+ * Mettre à jour le username
+ */
+const updateUsername = async (req, res, next) => {
+  try {
+    const { username } = req.body;
+    
+    if (!username || username.trim().length < 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le pseudo doit contenir au moins 3 caractères'
+      });
+    }
+    
+    // Vérifier si le username est déjà pris
+    const existingUser = await User.findOne({ 
+      username: username.trim(), 
+      _id: { $ne: req.user._id } 
+    });
+    
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: 'Ce pseudo est déjà utilisé'
+      });
+    }
+    
+    req.user.username = username.trim();
+    await req.user.save();
+    
+    logger.info(`Username mis à jour: ${req.user.email} -> ${username}`);
+    
+    res.json({
+      success: true,
+      message: 'Pseudo mis à jour',
+      data: {
+        user: {
+          _id: req.user._id,
+          username: req.user.username,
+          email: req.user.email,
+          firstName: req.user.firstName,
+          lastName: req.user.lastName,
+          avatar: req.user.avatar
+        }
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur updateUsername:', error);
+    next(error);
+  }
+};
+
+/**
  * Obtenir le profil d'un utilisateur
  */
 const getUserProfile = async (req, res, next) => {
@@ -216,5 +269,6 @@ module.exports = {
   updateAvatar,
   searchUsers,
   updateStatus,
-  deleteAccount
+  deleteAccount,
+  updateUsername
 };

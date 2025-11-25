@@ -37,6 +37,20 @@ router.post('/avatar', uploadAvatar, userController.updateAvatar);
 router.patch('/status', validate(schemas.updateStatus), userController.updateStatus);
 
 /**
+ * @route   PUT /api/users/me/username
+ * @desc    Définir le username
+ * @access  Private
+ */
+router.put('/me/username', userController.updateUsername);
+
+/**
+ * @route   POST /api/users/me/avatar
+ * @desc    Upload avatar utilisateur connecté
+ * @access  Private
+ */
+router.post('/me/avatar', uploadAvatar, userController.updateAvatar);
+
+/**
  * @route   DELETE /api/users/account
  * @desc    Supprimer le compte
  * @access  Private
