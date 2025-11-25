@@ -136,6 +136,17 @@ const emitGroupSettingsUpdated = (io, conversationId, settings, updatedBy) => {
   });
 };
 
+/**
+ * Émettre une notification à un utilisateur spécifique
+ */
+const emitNotification = (io, userId, notification) => {
+  if (io.emitToUser) {
+    io.emitToUser(userId, 'notification:new', {
+      notification
+    });
+  }
+};
+
 module.exports = {
   emitNewMessage,
   emitMessageDeleted,
@@ -148,5 +159,6 @@ module.exports = {
   emitMemberAdded,
   emitMemberRemoved,
   emitMemberRoleChanged,
-  emitGroupSettingsUpdated
+  emitGroupSettingsUpdated,
+  emitNotification
 };

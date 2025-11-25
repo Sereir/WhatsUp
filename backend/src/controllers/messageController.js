@@ -1,10 +1,11 @@
 const Message = require('../models/Message');
 const Conversation = require('../models/Conversation');
+const Notification = require('../models/Notification');
 const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
 const { processMediaFile, deleteMediaFile } = require('../utils/mediaProcessor');
-const { emitNewMessage, emitMessageDeleted, emitMessageEdited, emitReactionAdded, emitReactionRemoved } = require('../utils/socketHelpers');
+const { emitNewMessage, emitMessageDeleted, emitMessageEdited, emitReactionAdded, emitReactionRemoved, emitNotification } = require('../utils/socketHelpers');
 
 /**
  * Envoyer un message
@@ -82,6 +83,26 @@ const sendMessage = async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       emitNewMessage(io, message, conversationId);
+      
+      // Créer et émettre des notifications pour les autres participants
+      for (const participantId of conversation.participants) {
+        if (participantId.toString() !== userId.toString()) {
+          const notification = await Notification.createNotification({
+            recipient: participantId,
+            sender: userId,
+            type: 'message',
+            conversation: conversationId,
+            message: message._id,
+            content: type === 'text' ? content.substring(0, 100) : `📎 ${type}`,
+            data: {
+              conversationName: conversation.name,
+              isGroup: conversation.isGroup
+            }
+          });
+          
+          emitNotification(io, participantId, notification);
+        }
+      }
     }
     
     res.status(201).json({

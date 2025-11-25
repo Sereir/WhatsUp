@@ -1,6 +1,9 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const ConversationView = require('../models/ConversationView');
+const Message = require('../models/Message');
+const Notification = require('../models/Notification');
 const logger = require('../utils/logger');
 
 /**
@@ -63,14 +66,66 @@ const initializeSocket = (server) => {
     }
     onlineUsers.get(userId).push(socket.id);
     
+    // Mettre à jour le statut en ligne dans la base de données
+    User.findByIdAndUpdate(userId, { 
+      status: 'online',
+      lastSeen: new Date()
+    }).catch(err => {
+      logger.error('Erreur mise à jour statut online:', err);
+    });
+    
     // Notifier les autres que l'utilisateur est en ligne
     socket.broadcast.emit('user:online', {
       userId: userId,
+      timestamp: new Date(),
       user: {
         _id: socket.user._id,
         firstName: socket.user.firstName,
         lastName: socket.user.lastName,
         avatar: socket.user.avatar
+      }
+    });
+    
+    // Demander les messages/notifications manqués
+    socket.on('sync:request', async ({ lastSyncDate }) => {
+      try {
+        const syncDate = lastSyncDate ? new Date(lastSyncDate) : new Date(Date.now() - 24 * 60 * 60 * 1000);
+        
+        // Récupérer les notifications manquées
+        const missedNotifications = await Notification.find({
+          recipient: userId,
+          createdAt: { $gt: syncDate }
+        })
+          .populate('sender', 'firstName lastName avatar')
+          .populate('conversation', 'name isGroup avatar')
+          .sort({ createdAt: -1 })
+          .limit(100);
+        
+        // Récupérer les messages manqués (depuis les conversations de l'utilisateur)
+        const missedMessages = await Message.find({
+          createdAt: { $gt: syncDate },
+          sender: { $ne: userId }
+        })
+          .populate('sender', 'firstName lastName avatar')
+          .populate('conversation')
+          .sort({ createdAt: -1 })
+          .limit(100);
+        
+        // Filtrer les messages des conversations dont l'utilisateur est membre
+        const userMessages = missedMessages.filter(msg => 
+          msg.conversation && msg.conversation.participants.some(p => p.toString() === userId.toString())
+        );
+        
+        socket.emit('sync:response', {
+          notifications: missedNotifications,
+          messages: userMessages,
+          syncDate: new Date()
+        });
+        
+        logger.info(`Sync effectué pour user ${userId} depuis ${syncDate}`);
+      } catch (error) {
+        logger.error('Erreur sync:request:', error);
+        socket.emit('sync:error', { message: 'Erreur lors de la synchronisation' });
       }
     });
     
@@ -97,6 +152,7 @@ const initializeSocket = (server) => {
     socket.on('typing:start', ({ conversationId }) => {
       socket.to(`conversation:${conversationId}`).emit('typing:start', {
         conversationId,
+        timestamp: new Date(),
         user: {
           _id: socket.user._id,
           firstName: socket.user.firstName,
@@ -108,8 +164,28 @@ const initializeSocket = (server) => {
     socket.on('typing:stop', ({ conversationId }) => {
       socket.to(`conversation:${conversationId}`).emit('typing:stop', {
         conversationId,
-        userId: userId
+        userId: userId,
+        timestamp: new Date()
       });
+    });
+    
+    // Marquer une conversation comme vue
+    socket.on('conversation:view', async ({ conversationId, messageId }) => {
+      try {
+        await ConversationView.updateView(userId, conversationId, messageId);
+        
+        // Notifier les autres participants
+        socket.to(`conversation:${conversationId}`).emit('conversation:viewed', {
+          conversationId,
+          userId,
+          messageId,
+          viewedAt: new Date()
+        });
+        
+        logger.info(`User ${userId} a vu la conversation ${conversationId}`);
+      } catch (error) {
+        logger.error('Erreur conversation:view:', error);
+      }
     });
     
     // Envoi de message
@@ -204,6 +280,25 @@ const initializeSocket = (server) => {
       });
     });
     
+    // Heartbeat - le client envoie ping, on répond pong
+    socket.on('ping', () => {
+      socket.emit('pong', { timestamp: new Date() });
+    });
+    
+    // Reconnexion détectée
+    socket.on('reconnect_attempt', () => {
+      logger.info(`Tentative de reconnexion pour user ${userId}`);
+    });
+    
+    socket.on('reconnect', () => {
+      logger.info(`User ${userId} reconnecté`);
+      socket.emit('reconnected', { 
+        userId, 
+        timestamp: new Date(),
+        message: 'Reconnexion réussie' 
+      });
+    });
+    
     // Déconnexion
     socket.on('disconnect', () => {
       logger.info(`Socket déconnecté: ${socket.id} - Utilisateur: ${socket.user.email}`);
@@ -216,20 +311,31 @@ const initializeSocket = (server) => {
           // L'utilisateur n'a plus de sockets connectés
           onlineUsers.delete(userId);
           
+          const now = new Date();
+          
+          // Mettre à jour le statut et lastSeen dans la base de données
+          User.findByIdAndUpdate(userId, { 
+            status: 'offline',
+            lastSeen: now 
+          }).catch(err => {
+            logger.error('Erreur mise à jour lastSeen:', err);
+          });
+          
           // Notifier les autres que l'utilisateur est hors ligne
           socket.broadcast.emit('user:offline', {
             userId: userId,
-            lastSeen: new Date()
-          });
-          
-          // Mettre à jour le lastSeen dans la base de données
-          User.findByIdAndUpdate(userId, { lastSeen: new Date() }).catch(err => {
-            logger.error('Erreur mise à jour lastSeen:', err);
+            lastSeen: now,
+            timestamp: now
           });
         } else {
           onlineUsers.set(userId, sockets);
         }
       }
+    });
+    
+    // Gestion erreurs
+    socket.on('error', (error) => {
+      logger.error(`Erreur socket ${socket.id}:`, error);
     });
   });
   

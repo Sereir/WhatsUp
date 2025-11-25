@@ -1,10 +1,12 @@
 const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
+const Notification = require('../models/Notification');
 const logger = require('../utils/logger');
 const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
+const { emitNotification, emitMemberAdded, emitMemberRemoved, emitMemberRoleChanged, emitGroupSettingsUpdated } = require('../utils/socketHelpers');
 
 /**
  * Créer une conversation (one-to-one ou groupe)
@@ -511,6 +513,32 @@ const addGroupMember = async (req, res, next) => {
     await conversation.populate('participants', 'firstName lastName email avatar status');
     
     logger.info(`Membre ${newMemberId} ajouté au groupe ${conversationId} par ${req.user.email}`);
+    
+    // Émettre les événements Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      emitMemberAdded(io, conversationId, {
+        _id: newUser._id,
+        firstName: newUser.firstName,
+        lastName: newUser.lastName,
+        avatar: newUser.avatar
+      }, userId);
+      
+      // Notifier le nouveau membre
+      const notification = await Notification.createNotification({
+        recipient: newMemberId,
+        sender: userId,
+        type: 'group_add',
+        conversation: conversationId,
+        content: `Vous avez été ajouté au groupe "${conversation.groupName}"`,
+        data: {
+          groupName: conversation.groupName,
+          addedBy: `${req.user.firstName} ${req.user.lastName}`
+        }
+      });
+      
+      emitNotification(io, newMemberId, notification);
+    }
     
     res.json({
       success: true,
