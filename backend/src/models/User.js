@@ -14,6 +14,15 @@ const userSchema = new mongoose.Schema({
     trim: true,
     maxlength: [50, 'Le nom ne peut pas dépasser 50 caractères']
   },
+  username: {
+    type: String,
+    unique: true,
+    sparse: true, // Permet les valeurs null/undefined uniques
+    trim: true,
+    minlength: [3, 'Le pseudo doit contenir au moins 3 caractères'],
+    maxlength: [20, 'Le pseudo ne peut pas dépasser 20 caractères'],
+    match: [/^[a-zA-Z0-9_]+$/, 'Le pseudo ne peut contenir que des lettres, chiffres et underscores']
+  },
   email: {
     type: String,
     required: [true, 'L\'email est requis'],
@@ -84,7 +93,8 @@ userSchema.statics.search = async function(query, limit = 10) {
     $or: [
       { firstName: regex },
       { lastName: regex },
-      { email: regex }
+      { email: regex },
+      { username: regex }
     ]
   })
   .select('-password')

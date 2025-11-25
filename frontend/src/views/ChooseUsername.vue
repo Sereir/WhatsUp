@@ -36,18 +36,28 @@
 import { ref } from 'vue'
 import api from '../services/api'
 import { useRouter } from 'vue-router'
+import { useAuthStore } from '../store/auth'
 
 const username = ref('')
 const error = ref('')
 const router = useRouter()
+const authStore = useAuthStore()
 
 const submit = async () => {
   try {
     error.value = ''
-    await api.put('/api/users/me/username', { username: username.value })
+    const res = await api.put('/api/users/me/username', { username: username.value })
+    console.log('Username updated:', res.data)
+    
+    // Mettre à jour le user dans le store
+    if (res.data.data && res.data.data.user) {
+      authStore.setUser(res.data.data.user)
+    }
+    
     router.push('/upload-avatar')
   } catch (err) {
     error.value = err.response?.data?.message || 'Erreur'
+    console.error('Error updating username:', err)
   }
 }
 </script>

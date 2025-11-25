@@ -130,17 +130,15 @@ const login = async (req, res, next) => {
       success: true,
       message: 'Connexion réussie',
       data: {
-        user: {
-          id: user._id,
-          firstName: user.firstName,
-          lastName: user.lastName,
-          email: user.email,
-          avatar: user.avatar,
-          bio: user.bio,
-          status: user.status
-        },
-        token,
-        sessionId: session._id
+        _id: user._id,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        username: user.username,
+        email: user.email,
+        avatar: user.avatar,
+        bio: user.bio,
+        status: user.status,
+        token
       }
     });
     
@@ -187,16 +185,15 @@ const getCurrentUser = async (req, res, next) => {
     res.json({
       success: true,
       data: {
-        user: {
-          id: req.user._id,
-          firstName: req.user.firstName,
-          lastName: req.user.lastName,
-          email: req.user.email,
-          avatar: req.user.avatar,
-          bio: req.user.bio,
-          status: req.user.status,
-          lastSeen: req.user.lastSeen
-        }
+        _id: req.user._id,
+        firstName: req.user.firstName,
+        lastName: req.user.lastName,
+        username: req.user.username,
+        email: req.user.email,
+        avatar: req.user.avatar,
+        bio: req.user.bio,
+        status: req.user.status,
+        lastSeen: req.user.lastSeen
       }
     });
   } catch (error) {

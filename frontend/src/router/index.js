@@ -3,14 +3,16 @@ import Login from '../views/Login.vue'
 import Register from '../views/Register.vue'
 import ChooseUsername from '../views/ChooseUsername.vue'
 import UploadAvatar from '../views/UploadAvatar.vue'
+import Chat from '../views/Chat.vue'
 import { useAuthStore } from '../store/auth'
 
 const routes = [
-  { path: '/', redirect: '/login' },
+  { path: '/', redirect: '/chat' },
   { path: '/login', component: Login },
   { path: '/register', component: Register },
   { path: '/choose-username', component: ChooseUsername, meta: { requiresAuth: true } },
-  { path: '/upload-avatar', component: UploadAvatar, meta: { requiresAuth: true } }
+  { path: '/upload-avatar', component: UploadAvatar, meta: { requiresAuth: true } },
+  { path: '/chat', component: Chat, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({
@@ -24,7 +26,7 @@ router.beforeEach((to, from, next) => {
   if (to.meta.requiresAuth && !authStore.token) {
     next('/login')
   } else if ((to.path === '/login' || to.path === '/register') && authStore.token) {
-    next('/choose-username')
+    next('/chat')
   } else {
     next()
   }

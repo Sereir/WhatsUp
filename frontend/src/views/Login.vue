@@ -74,15 +74,16 @@ const submit = async () => {
   try {
     error.value = ''
     const res = await api.post('/api/auth/login', { email: email.value, password: password.value })
-    const { token, user } = res.data.data
-    auth.login(token, remember.value)
-    auth.setUser(user)
+    const data = res.data.data
+    console.log('Login response:', data)
+    auth.login(data.token, remember.value)
+    auth.setUser(data)
     
     // Redirection selon l'état du profil
-    if (!user.username) {
+    if (!data.username) {
       router.push('/choose-username')
     } else {
-      router.push('/upload-avatar')
+      router.push('/chat')
     }
   } catch (err) {
     error.value = err.response?.data?.message || 'Erreur connexion'

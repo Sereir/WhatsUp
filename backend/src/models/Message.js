@@ -159,8 +159,10 @@ messageSchema.statics.getConversationMessages = async function(conversationId, u
  * Méthode pour marquer comme lu par un utilisateur
  */
 messageSchema.methods.markAsRead = async function(userId) {
+  if (!userId) return;
+  
   // Vérifier si déjà lu
-  const alreadyRead = this.readBy.some(r => r.user.toString() === userId.toString());
+  const alreadyRead = this.readBy.some(r => r?.user?.toString() === userId.toString());
   
   if (!alreadyRead) {
     this.readBy.push({
@@ -174,10 +176,10 @@ messageSchema.methods.markAsRead = async function(userId) {
     
     if (conversation) {
       const allParticipants = conversation.participants.filter(
-        p => p.toString() !== this.sender.toString()
+        p => p?.toString() !== this.sender?.toString()
       );
       const allRead = allParticipants.every(p =>
-        this.readBy.some(r => r.user.toString() === p.toString())
+        this.readBy.some(r => r?.user?.toString() === p?.toString())
       );
       
       if (allRead) {

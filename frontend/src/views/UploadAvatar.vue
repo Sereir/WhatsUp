@@ -12,8 +12,8 @@
         </div>
         <div v-if="info" class="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg">
           {{ info }}
-          <button @click="router.push('/login')" class="mt-2 underline font-semibold">
-            Retour à l'accueil
+          <button @click="router.push('/chat')" class="mt-2 underline font-semibold">
+            Aller au chat
           </button>
         </div>
 
