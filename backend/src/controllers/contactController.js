@@ -1,6 +1,8 @@
 const Contact = require('../models/Contact');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const SecurityAlertService = require('../services/securityAlertService');
+const { addBreadcrumb } = require('../config/sentry');
 
 /**
  * Ajouter un contact
@@ -45,6 +47,14 @@ const addContact = async (req, res, next) => {
     
     // Populate pour retourner les infos du contact
     await contact.populate('contact', 'firstName lastName email avatar status lastSeen');
+    
+    // Créer alerte de sécurité
+    await SecurityAlertService.logContactAdded(userId, contactId, req);
+    
+    addBreadcrumb('contact', 'Contact added', 'info', {
+      userId: userId.toString(),
+      contactId
+    });
     
     logger.info(`Contact ajouté: ${req.user.email} -> ${contactUser.email}`);
     
@@ -159,6 +169,14 @@ const blockContact = async (req, res, next) => {
     
     contact.isBlocked = true;
     await contact.save();
+    
+    // Créer alerte de sécurité
+    await SecurityAlertService.logContactBlocked(userId, contactId, req);
+    
+    addBreadcrumb('contact', 'Contact blocked', 'info', {
+      userId: userId.toString(),
+      contactId
+    });
     
     logger.info(`Contact bloqué: ${req.user.email}`);
     

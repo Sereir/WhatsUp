@@ -3,6 +3,8 @@ const sharp = require('sharp');
 const fs = require('fs').promises;
 const path = require('path');
 const logger = require('../utils/logger');
+const SecurityAlertService = require('../services/securityAlertService');
+const { addBreadcrumb } = require('../config/sentry');
 
 /**
  * Obtenir le profil d'un utilisateur
@@ -46,6 +48,14 @@ const updateProfile = async (req, res, next) => {
       updateData,
       { new: true, runValidators: true }
     ).select('-password');
+    
+    // Créer alerte de sécurité
+    await SecurityAlertService.logProfileChange(req.user._id, Object.keys(updateData), req);
+    
+    addBreadcrumb('user', 'Profile updated', 'info', {
+      userId: user._id.toString(),
+      changes: Object.keys(updateData)
+    });
     
     logger.info(`Profil mis à jour: ${user.email}`);
     

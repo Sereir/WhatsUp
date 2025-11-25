@@ -1,6 +1,7 @@
 const { verifyToken } = require('../config/jwt');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const { setSentryUser, addBreadcrumb } = require('../config/sentry');
 
 /**
  * Middleware d'authentification JWT
@@ -35,6 +36,16 @@ const authMiddleware = async (req, res, next) => {
     
     // Attacher l'utilisateur à la requête
     req.user = user;
+    
+    // Ajouter le contexte utilisateur à Sentry
+    setSentryUser(user);
+    
+    // Ajouter un breadcrumb
+    addBreadcrumb('auth', 'User authenticated', 'info', {
+      userId: user._id.toString(),
+      email: user.email
+    });
+    
     next();
     
   } catch (error) {

@@ -3,6 +3,8 @@ const { generateToken } = require('../config/jwt');
 const { createSession } = require('./sessionController');
 const Session = require('../models/Session');
 const logger = require('../utils/logger');
+const SecurityAlertService = require('../services/securityAlertService');
+const { addBreadcrumb } = require('../config/sentry');
 
 /**
  * Inscription d'un nouvel utilisateur
@@ -30,6 +32,14 @@ const register = async (req, res, next) => {
     
     // Générer le token
     const token = generateToken(user._id);
+    
+    // Créer une alerte de sécurité
+    await SecurityAlertService.logLogin(user._id, req, true);
+    
+    addBreadcrumb('auth', 'New user registered', 'info', {
+      userId: user._id.toString(),
+      email
+    });
     
     logger.info(`Nouvel utilisateur inscrit: ${email}`);
     
@@ -67,6 +77,9 @@ const login = async (req, res, next) => {
     const user = await User.findOne({ email }).select('+password');
     
     if (!user) {
+      // Log tentative de connexion échouée
+      addBreadcrumb('auth', 'Login failed - user not found', 'warning', { email });
+      
       return res.status(401).json({
         success: false,
         message: 'Email ou mot de passe incorrect'
@@ -77,6 +90,14 @@ const login = async (req, res, next) => {
     const isPasswordValid = await user.comparePassword(password);
     
     if (!isPasswordValid) {
+      // Log tentative échouée
+      await SecurityAlertService.logLogin(user._id, req, false);
+      
+      addBreadcrumb('auth', 'Login failed - invalid password', 'warning', {
+        userId: user._id.toString(),
+        email
+      });
+      
       return res.status(401).json({
         success: false,
         message: 'Email ou mot de passe incorrect'
@@ -93,6 +114,15 @@ const login = async (req, res, next) => {
     
     // Créer une session
     const session = await createSession(user._id, req);
+    
+    // Créer une alerte de sécurité pour nouvelle connexion
+    await SecurityAlertService.logLogin(user._id, req, true);
+    
+    addBreadcrumb('auth', 'User logged in successfully', 'info', {
+      userId: user._id.toString(),
+      email,
+      sessionId: session._id.toString()
+    });
     
     logger.info(`Utilisateur connecté: ${email}`);
     

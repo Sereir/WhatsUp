@@ -59,6 +59,9 @@ const initializeSocket = (server) => {
     const userId = socket.userId;
     
     logger.info(`Socket connecté: ${socket.id} - Utilisateur: ${socket.user.email}`);
+    logger.logWebSocket('connection', socket.id, userId, {
+      email: socket.user.email
+    });
     
     // Ajouter l'utilisateur à la liste des connectés
     if (!onlineUsers.has(userId)) {
@@ -302,6 +305,7 @@ const initializeSocket = (server) => {
     // Déconnexion
     socket.on('disconnect', () => {
       logger.info(`Socket déconnecté: ${socket.id} - Utilisateur: ${socket.user.email}`);
+      logger.logWebSocket('disconnect', socket.id, userId);
       
       // Retirer le socket de la liste
       if (onlineUsers.has(userId)) {

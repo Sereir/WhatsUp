@@ -64,7 +64,8 @@ app.get('/', (req, res) => {
       conversations: '/api/conversations',
       messages: '/api/messages',
       notifications: '/api/notifications',
-      sync: '/api/sync'
+      sync: '/api/sync',
+      securityAlerts: '/api/security-alerts'
     }
   });
 });
@@ -78,6 +79,7 @@ app.use('/api/conversations', require('./routes/conversation.routes'));
 app.use('/api/messages', require('./routes/message.routes'));
 app.use('/api/notifications', require('./routes/notification.routes'));
 app.use('/api/sync', require('./routes/sync.routes'));
+app.use('/api/security-alerts', require('./routes/securityAlert.routes'));
 
 // Gestion des routes non trouvées
 app.use((req, res) => {
