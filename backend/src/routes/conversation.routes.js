@@ -3,6 +3,8 @@ const router = express.Router();
 const conversationController = require('../controllers/conversationController');
 const authMiddleware = require('../middleware/auth.middleware');
 const { validate, schemas } = require('../middleware/validation.middleware');
+const { uploadGroupAvatar } = require('../middleware/upload.middleware');
+const { isGroup, isMember, isAdmin, hasPermission } = require('../middleware/groupPermissions.middleware');
 
 // Toutes les routes nécessitent l'authentification
 router.use(authMiddleware);
@@ -73,5 +75,47 @@ router.patch('/:conversationId/notifications', validate(schemas.updateNotificati
  * @access  Private (admin only)
  */
 router.patch('/:conversationId/group', validate(schemas.updateGroupInfo), conversationController.updateGroupInfo);
+
+/**
+ * @route   POST /api/conversations/:conversationId/members
+ * @desc    Ajouter un membre au groupe
+ * @access  Private (admin/moderator)
+ */
+router.post('/:conversationId/members', isGroup, hasPermission('add_members'), validate(schemas.addGroupMember), conversationController.addGroupMember);
+
+/**
+ * @route   DELETE /api/conversations/:conversationId/members/:userId
+ * @desc    Retirer un membre du groupe
+ * @access  Private (admin/moderator)
+ */
+router.delete('/:conversationId/members/:userId', isGroup, hasPermission('remove_members'), conversationController.removeGroupMember);
+
+/**
+ * @route   POST /api/conversations/:conversationId/leave
+ * @desc    Quitter un groupe
+ * @access  Private (member)
+ */
+router.post('/:conversationId/leave', isGroup, isMember, conversationController.leaveGroup);
+
+/**
+ * @route   PATCH /api/conversations/:conversationId/members/:userId/role
+ * @desc    Changer le rôle d'un membre
+ * @access  Private (admin only)
+ */
+router.patch('/:conversationId/members/:userId/role', isGroup, isAdmin, validate(schemas.changeMemberRole), conversationController.changeMemberRole);
+
+/**
+ * @route   PATCH /api/conversations/:conversationId/settings
+ * @desc    Mettre à jour les paramètres du groupe
+ * @access  Private (admin only)
+ */
+router.patch('/:conversationId/settings', isGroup, isAdmin, validate(schemas.updateGroupSettings), conversationController.updateGroupSettings);
+
+/**
+ * @route   POST /api/conversations/:conversationId/avatar
+ * @desc    Uploader une photo de groupe
+ * @access  Private (admin/moderator)
+ */
+router.post('/:conversationId/avatar', isGroup, hasPermission('edit_group_info'), uploadGroupAvatar, conversationController.uploadGroupAvatar);
 
 module.exports = router;

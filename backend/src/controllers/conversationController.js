@@ -2,6 +2,9 @@ const Conversation = require('../models/Conversation');
 const Message = require('../models/Message');
 const User = require('../models/User');
 const logger = require('../utils/logger');
+const sharp = require('sharp');
+const fs = require('fs').promises;
+const path = require('path');
 
 /**
  * Créer une conversation (one-to-one ou groupe)
@@ -30,6 +33,13 @@ const createConversation = async (req, res, next) => {
       // Ajouter le créateur aux participants
       const allParticipants = [...new Set([userId, ...participants])];
       
+      // Initialiser les rôles et permissions
+      const memberRoles = new Map();
+      memberRoles.set(userId.toString(), 'admin');
+      participants.forEach(p => {
+        memberRoles.set(p.toString(), 'member');
+      });
+      
       const conversation = await Conversation.create({
         participants: allParticipants,
         isGroup: true,
@@ -37,6 +47,14 @@ const createConversation = async (req, res, next) => {
         groupDescription,
         creator: userId,
         admins: [userId],
+        memberRoles: Object.fromEntries(memberRoles),
+        groupSettings: {
+          onlyAdminsCanSend: false,
+          onlyAdminsCanEditInfo: true,
+          onlyAdminsCanAddMembers: false,
+          membersCanLeave: true,
+          maxMembers: 256
+        },
         unreadCount: Object.fromEntries(allParticipants.map(p => [p.toString(), 0]))
       });
       
@@ -440,6 +458,427 @@ const updateGroupInfo = async (req, res, next) => {
   }
 };
 
+/**
+ * Ajouter un membre au groupe
+ */
+const addGroupMember = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const { userId: newMemberId } = req.body;
+    const userId = req.user._id;
+    
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (!conversation.canPerformAction(userId, 'add_members')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'avez pas la permission d\'ajouter des membres'
+      });
+    }
+    
+    // Vérifier que le nouvel utilisateur existe
+    const newUser = await User.findById(newMemberId);
+    if (!newUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Utilisateur non trouvé'
+      });
+    }
+    
+    await conversation.addMember(newMemberId);
+    
+    // Créer un message système
+    await Message.createSystemMessage(
+      conversation._id,
+      `${req.user.firstName} ${req.user.lastName} a ajouté ${newUser.firstName} ${newUser.lastName}`
+    );
+    
+    await conversation.populate('participants', 'firstName lastName email avatar status');
+    
+    logger.info(`Membre ${newMemberId} ajouté au groupe ${conversationId} par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Membre ajouté avec succès',
+      data: { conversation }
+    });
+    
+  } catch (error) {
+    if (error.message.includes('déjà membre') || error.message.includes('limite')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    logger.error('Erreur addGroupMember:', error);
+    next(error);
+  }
+};
+
+/**
+ * Retirer un membre du groupe
+ */
+const removeGroupMember = async (req, res, next) => {
+  try {
+    const { conversationId, userId: memberIdToRemove } = req.params;
+    const userId = req.user._id;
+    
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (!conversation.canPerformAction(userId, 'remove_members')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'avez pas la permission de retirer des membres'
+      });
+    }
+    
+    const memberUser = await User.findById(memberIdToRemove);
+    
+    await conversation.removeMember(memberIdToRemove);
+    
+    // Créer un message système
+    if (memberUser) {
+      await Message.createSystemMessage(
+        conversation._id,
+        `${req.user.firstName} ${req.user.lastName} a retiré ${memberUser.firstName} ${memberUser.lastName}`
+      );
+    }
+    
+    await conversation.populate('participants', 'firstName lastName email avatar status');
+    
+    logger.info(`Membre ${memberIdToRemove} retiré du groupe ${conversationId} par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Membre retiré avec succès',
+      data: { conversation }
+    });
+    
+  } catch (error) {
+    if (error.message.includes('créateur') || error.message.includes('membre')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    logger.error('Erreur removeGroupMember:', error);
+    next(error);
+  }
+};
+
+/**
+ * Quitter un groupe
+ */
+const leaveGroup = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user._id;
+    
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (!conversation.canPerformAction(userId, 'leave_group')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'avez pas la permission de quitter ce groupe'
+      });
+    }
+    
+    // Le créateur ne peut pas quitter
+    if (conversation.creator.toString() === userId.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le créateur ne peut pas quitter le groupe. Transférez d\'abord la propriété ou supprimez le groupe.'
+      });
+    }
+    
+    await conversation.removeMember(userId);
+    
+    // Créer un message système
+    await Message.createSystemMessage(
+      conversation._id,
+      `${req.user.firstName} ${req.user.lastName} a quitté le groupe`
+    );
+    
+    logger.info(`Utilisateur ${userId} a quitté le groupe ${conversationId}`);
+    
+    res.json({
+      success: true,
+      message: 'Vous avez quitté le groupe'
+    });
+    
+  } catch (error) {
+    logger.error('Erreur leaveGroup:', error);
+    next(error);
+  }
+};
+
+/**
+ * Changer le rôle d'un membre
+ */
+const changeMemberRole = async (req, res, next) => {
+  try {
+    const { conversationId, userId: memberIdToChange } = req.params;
+    const { role } = req.body;
+    const userId = req.user._id;
+    
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (!conversation.canPerformAction(userId, 'change_roles')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'avez pas la permission de changer les rôles'
+      });
+    }
+    
+    // Ne pas permettre de changer le rôle du créateur
+    if (conversation.creator.toString() === memberIdToChange.toString()) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le rôle du créateur ne peut pas être modifié'
+      });
+    }
+    
+    const memberUser = await User.findById(memberIdToChange);
+    if (!memberUser) {
+      return res.status(404).json({
+        success: false,
+        message: 'Membre non trouvé'
+      });
+    }
+    
+    const oldRole = conversation.getMemberRole(memberIdToChange);
+    await conversation.setMemberRole(memberIdToChange, role);
+    
+    // Créer un message système
+    const roleNames = { admin: 'administrateur', moderator: 'modérateur', member: 'membre' };
+    await Message.createSystemMessage(
+      conversation._id,
+      `${req.user.firstName} ${req.user.lastName} a changé le rôle de ${memberUser.firstName} ${memberUser.lastName} : ${roleNames[oldRole]} → ${roleNames[role]}`
+    );
+    
+    await conversation.populate('participants', 'firstName lastName email avatar status');
+    
+    logger.info(`Rôle de ${memberIdToChange} changé en ${role} dans le groupe ${conversationId}`);
+    
+    res.json({
+      success: true,
+      message: 'Rôle modifié avec succès',
+      data: { conversation }
+    });
+    
+  } catch (error) {
+    if (error.message.includes('Rôle invalide')) {
+      return res.status(400).json({
+        success: false,
+        message: error.message
+      });
+    }
+    logger.error('Erreur changeMemberRole:', error);
+    next(error);
+  }
+};
+
+/**
+ * Mettre à jour les paramètres du groupe
+ */
+const updateGroupSettings = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const { onlyAdminsCanSend, onlyAdminsCanEditInfo, onlyAdminsCanAddMembers, membersCanLeave, maxMembers } = req.body;
+    const userId = req.user._id;
+    
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (!conversation.canPerformAction(userId, 'change_settings')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'avez pas la permission de modifier les paramètres'
+      });
+    }
+    
+    if (onlyAdminsCanSend !== undefined) conversation.groupSettings.onlyAdminsCanSend = onlyAdminsCanSend;
+    if (onlyAdminsCanEditInfo !== undefined) conversation.groupSettings.onlyAdminsCanEditInfo = onlyAdminsCanEditInfo;
+    if (onlyAdminsCanAddMembers !== undefined) conversation.groupSettings.onlyAdminsCanAddMembers = onlyAdminsCanAddMembers;
+    if (membersCanLeave !== undefined) conversation.groupSettings.membersCanLeave = membersCanLeave;
+    if (maxMembers !== undefined) conversation.groupSettings.maxMembers = maxMembers;
+    
+    await conversation.save();
+    
+    logger.info(`Paramètres du groupe ${conversationId} mis à jour par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Paramètres mis à jour avec succès',
+      data: { conversation }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur updateGroupSettings:', error);
+    next(error);
+  }
+};
+
+/**
+ * Uploader une photo de groupe
+ */
+const uploadGroupAvatar = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    const userId = req.user._id;
+    
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aucune image fournie'
+      });
+    }
+    
+    const conversation = await Conversation.findById(conversationId);
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Vérifier les permissions
+    if (!conversation.canPerformAction(userId, 'edit_group_info')) {
+      return res.status(403).json({
+        success: false,
+        message: 'Vous n\'avez pas la permission de modifier la photo du groupe'
+      });
+    }
+    
+    // Supprimer l'ancienne photo si elle existe
+    if (conversation.groupAvatar) {
+      const oldPath = path.join(process.cwd(), conversation.groupAvatar);
+      try {
+        await fs.unlink(oldPath);
+      } catch (err) {
+        logger.warn(`Impossible de supprimer l'ancienne photo: ${err.message}`);
+      }
+    }
+    
+    // Compresser l'image
+    const compressedPath = req.file.path.replace(path.extname(req.file.path), '-compressed.jpg');
+    
+    await sharp(req.file.path)
+      .resize(500, 500, { fit: 'cover' })
+      .jpeg({ quality: 85 })
+      .toFile(compressedPath);
+    
+    // Supprimer l'original
+    await fs.unlink(req.file.path);
+    
+    conversation.groupAvatar = compressedPath.replace(process.cwd(), '').replace(/\\/g, '/');
+    await conversation.save();
+    
+    // Créer un message système
+    await Message.createSystemMessage(
+      conversation._id,
+      `${req.user.firstName} ${req.user.lastName} a changé la photo du groupe`
+    );
+    
+    logger.info(`Photo du groupe ${conversationId} mise à jour par ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Photo de groupe mise à jour',
+      data: { 
+        conversation,
+        groupAvatar: conversation.groupAvatar
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur uploadGroupAvatar:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   createConversation,
   getConversations,
@@ -449,5 +888,11 @@ module.exports = {
   deleteConversation,
   searchConversations,
   updateNotificationSettings,
-  updateGroupInfo
+  updateGroupInfo,
+  addGroupMember,
+  removeGroupMember,
+  leaveGroup,
+  changeMemberRole,
+  updateGroupSettings,
+  uploadGroupAvatar
 };

@@ -25,6 +25,24 @@ const conversationSchema = new mongoose.Schema({
     type: String,
     maxlength: [500, 'La description ne peut pas dépasser 500 caractères']
   },
+  // Système de rôles pour les groupes
+  memberRoles: {
+    type: Map,
+    of: {
+      type: String,
+      enum: ['admin', 'moderator', 'member'],
+      default: 'member'
+    },
+    default: {}
+  },
+  // Permissions du groupe
+  groupSettings: {
+    onlyAdminsCanSend: { type: Boolean, default: false },
+    onlyAdminsCanEditInfo: { type: Boolean, default: true },
+    onlyAdminsCanAddMembers: { type: Boolean, default: false },
+    membersCanLeave: { type: Boolean, default: true },
+    maxMembers: { type: Number, default: 256 }
+  },
   admins: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User'
@@ -164,6 +182,140 @@ conversationSchema.methods.isParticipant = function(userId) {
 conversationSchema.methods.isAdmin = function(userId) {
   if (!this.isGroup) return false;
   return this.admins.some(a => a.toString() === userId.toString());
+};
+
+/**
+ * Méthode pour obtenir le rôle d'un utilisateur dans le groupe
+ */
+conversationSchema.methods.getMemberRole = function(userId) {
+  if (!this.isGroup) return null;
+  return this.memberRoles.get(userId.toString()) || 'member';
+};
+
+/**
+ * Méthode pour vérifier si un utilisateur est modérateur ou admin
+ */
+conversationSchema.methods.isModerator = function(userId) {
+  if (!this.isGroup) return false;
+  const role = this.getMemberRole(userId);
+  return role === 'moderator' || role === 'admin';
+};
+
+/**
+ * Méthode pour définir le rôle d'un membre
+ */
+conversationSchema.methods.setMemberRole = function(userId, role) {
+  if (!this.isGroup) {
+    throw new Error('Les rôles ne sont disponibles que pour les groupes');
+  }
+  if (!['admin', 'moderator', 'member'].includes(role)) {
+    throw new Error('Rôle invalide');
+  }
+  
+  this.memberRoles.set(userId.toString(), role);
+  
+  // Synchroniser avec le tableau admins
+  if (role === 'admin' && !this.isAdmin(userId)) {
+    this.admins.push(userId);
+  } else if (role !== 'admin' && this.isAdmin(userId)) {
+    this.admins = this.admins.filter(a => a.toString() !== userId.toString());
+  }
+  
+  return this.save();
+};
+
+/**
+ * Méthode pour ajouter un membre au groupe
+ */
+conversationSchema.methods.addMember = async function(userId, addedBy = null) {
+  if (!this.isGroup) {
+    throw new Error('Impossible d\'ajouter des membres à une conversation one-to-one');
+  }
+  
+  if (this.isParticipant(userId)) {
+    throw new Error('L\'utilisateur est déjà membre du groupe');
+  }
+  
+  // Vérifier la limite de membres
+  if (this.participants.length >= this.groupSettings.maxMembers) {
+    throw new Error(`Le groupe a atteint la limite de ${this.groupSettings.maxMembers} membres`);
+  }
+  
+  this.participants.push(userId);
+  this.memberRoles.set(userId.toString(), 'member');
+  this.unreadCount.set(userId.toString(), 0);
+  
+  return this.save();
+};
+
+/**
+ * Méthode pour retirer un membre du groupe
+ */
+conversationSchema.methods.removeMember = async function(userId) {
+  if (!this.isGroup) {
+    throw new Error('Impossible de retirer des membres d\'une conversation one-to-one');
+  }
+  
+  if (!this.isParticipant(userId)) {
+    throw new Error('L\'utilisateur n\'est pas membre du groupe');
+  }
+  
+  // Ne pas permettre de retirer le créateur
+  if (this.creator.toString() === userId.toString()) {
+    throw new Error('Le créateur ne peut pas être retiré du groupe');
+  }
+  
+  this.participants = this.participants.filter(p => p.toString() !== userId.toString());
+  this.admins = this.admins.filter(a => a.toString() !== userId.toString());
+  this.memberRoles.delete(userId.toString());
+  this.unreadCount.delete(userId.toString());
+  
+  return this.save();
+};
+
+/**
+ * Méthode pour vérifier les permissions d'un utilisateur
+ */
+conversationSchema.methods.canPerformAction = function(userId, action) {
+  if (!this.isGroup) return true;
+  
+  const role = this.getMemberRole(userId);
+  const isCreator = this.creator.toString() === userId.toString();
+  
+  switch (action) {
+    case 'send_message':
+      if (this.groupSettings.onlyAdminsCanSend) {
+        return role === 'admin' || isCreator;
+      }
+      return true;
+      
+    case 'edit_group_info':
+      if (this.groupSettings.onlyAdminsCanEditInfo) {
+        return role === 'admin' || role === 'moderator' || isCreator;
+      }
+      return true;
+      
+    case 'add_members':
+      if (this.groupSettings.onlyAdminsCanAddMembers) {
+        return role === 'admin' || role === 'moderator' || isCreator;
+      }
+      return true;
+      
+    case 'remove_members':
+      return role === 'admin' || role === 'moderator' || isCreator;
+      
+    case 'change_roles':
+      return role === 'admin' || isCreator;
+      
+    case 'change_settings':
+      return role === 'admin' || isCreator;
+      
+    case 'leave_group':
+      return this.groupSettings.membersCanLeave || isCreator;
+      
+    default:
+      return false;
+  }
 };
 
 /**

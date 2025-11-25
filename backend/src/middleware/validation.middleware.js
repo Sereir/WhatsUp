@@ -129,6 +129,29 @@ const schemas = {
   updateGroupInfo: Joi.object({
     groupName: Joi.string().trim().max(100).optional(),
     groupDescription: Joi.string().max(500).allow('').optional()
+  }),
+  
+  addGroupMember: Joi.object({
+    userId: Joi.string().required()
+      .messages({
+        'string.empty': 'L\'ID de l\'utilisateur est requis'
+      })
+  }),
+  
+  changeMemberRole: Joi.object({
+    role: Joi.string().valid('admin', 'moderator', 'member').required()
+      .messages({
+        'string.empty': 'Le rôle est requis',
+        'any.only': 'Le rôle doit être admin, moderator ou member'
+      })
+  }),
+  
+  updateGroupSettings: Joi.object({
+    onlyAdminsCanSend: Joi.boolean().optional(),
+    onlyAdminsCanEditInfo: Joi.boolean().optional(),
+    onlyAdminsCanAddMembers: Joi.boolean().optional(),
+    membersCanLeave: Joi.boolean().optional(),
+    maxMembers: Joi.number().integer().min(2).max(1000).optional()
   })
 };
 

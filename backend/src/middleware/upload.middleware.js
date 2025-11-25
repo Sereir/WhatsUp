@@ -70,7 +70,25 @@ const uploadMedia = multer({
   fileFilter: mediaFilter
 });
 
+// Configuration de multer pour photos de groupe
+const uploadGroupAvatar = multer({
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, uploadDir);
+    },
+    filename: (req, file, cb) => {
+      const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+      cb(null, 'group-' + uniqueSuffix + path.extname(file.originalname));
+    }
+  }),
+  limits: {
+    fileSize: 5 * 1024 * 1024 // 5MB max
+  },
+  fileFilter: imageFilter
+});
+
 module.exports = {
   uploadAvatar: uploadAvatar.single('avatar'),
-  uploadMedia: uploadMedia.single('file')
+  uploadMedia: uploadMedia.single('file'),
+  uploadGroupAvatar: uploadGroupAvatar.single('groupAvatar')
 };
