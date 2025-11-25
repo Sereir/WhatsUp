@@ -4,6 +4,7 @@ const logger = require('../utils/logger');
 const path = require('path');
 const fs = require('fs').promises;
 const { processMediaFile, deleteMediaFile } = require('../utils/mediaProcessor');
+const { emitNewMessage, emitMessageDeleted, emitMessageEdited, emitReactionAdded, emitReactionRemoved } = require('../utils/socketHelpers');
 
 /**
  * Envoyer un message
@@ -76,6 +77,12 @@ const sendMessage = async (req, res, next) => {
     }
     
     logger.info(`Message envoyé dans conversation ${conversationId} par ${req.user.email}`);
+    
+    // Émettre l'événement Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      emitNewMessage(io, message, conversationId);
+    }
     
     res.status(201).json({
       success: true,
@@ -183,6 +190,12 @@ const editMessage = async (req, res, next) => {
     
     logger.info(`Message ${messageId} édité par ${req.user.email}`);
     
+    // Émettre l'événement Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      emitMessageEdited(io, message, message.conversation);
+    }
+    
     res.json({
       success: true,
       message: 'Message édité',
@@ -241,6 +254,12 @@ const deleteMessage = async (req, res, next) => {
     } else {
       await message.deleteForUser(userId);
       logger.info(`Message ${messageId} supprimé pour ${req.user.email}`);
+    }
+    
+    // Émettre l'événement Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      emitMessageDeleted(io, messageId, message.conversation, deleteForEveryone, userId);
     }
     
     res.json({
@@ -343,6 +362,13 @@ const addReaction = async (req, res, next) => {
     
     logger.info(`Réaction ajoutée au message ${messageId} par ${req.user.email}`);
     
+    // Émettre l'événement Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      const reaction = message.reactions.find(r => r.user.toString() === userId.toString());
+      emitReactionAdded(io, messageId, message.conversation, reaction);
+    }
+    
     res.json({
       success: true,
       message: 'Réaction ajoutée',
@@ -375,6 +401,12 @@ const removeReaction = async (req, res, next) => {
     await message.removeReaction(userId);
     
     logger.info(`Réaction retirée du message ${messageId} par ${req.user.email}`);
+    
+    // Émettre l'événement Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      emitReactionRemoved(io, messageId, message.conversation, userId);
+    }
     
     res.json({
       success: true,

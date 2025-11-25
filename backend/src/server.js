@@ -1,30 +1,46 @@
 require('dotenv').config();
+const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/database');
+const { initializeSocket } = require('./config/socket');
 const logger = require('./utils/logger');
 
 const PORT = process.env.PORT || 3000;
 
-// Fonction de d�marrage
+// Fonction de démarrage
 const startServer = async () => {
   try {
-    // 1. Connexion � MongoDB
+    // 1. Connexion à MongoDB
     await connectDB(); 
     
-    // 2. D�marrer le serveur
-    const server = app.listen(PORT, () => {
-      logger.info('Serveur d�marr� sur le port  ' + PORT);
+    // 2. Créer serveur HTTP
+    const server = http.createServer(app);
+    
+    // 3. Initialiser Socket.io
+    const io = initializeSocket(server);
+    
+    // Attacher io à l'app pour y accéder depuis les controllers
+    app.set('io', io);
+    
+    // 4. Démarrer le serveur
+    server.listen(PORT, () => {
+      logger.info('Serveur démarré sur le port  ' + PORT);
       logger.info('Environnement: ' + (process.env.NODE_ENV || 'development'));
-      console.log('\n Serveur d�marr� sur le port ' + PORT);
-      console.log(' URL: http://localhost:' + PORT);
-      console.log(' Environnement: ' + (process.env.NODE_ENV || 'development') + '\n');
+      logger.info('WebSocket (Socket.io) activé');
+      console.log('\n✅ Serveur démarré sur le port ' + PORT);
+      console.log('🌐 URL: http://localhost:' + PORT);
+      console.log('🔌 WebSocket: ws://localhost:' + PORT);
+      console.log('📁 Environnement: ' + (process.env.NODE_ENV || 'development') + '\n');
     });
 
     // Graceful shutdown
     const gracefulShutdown = () => {
-      logger.info('Arr�t du serveur...');
+      logger.info('Arrêt du serveur...');
+      io.close(() => {
+        logger.info('Socket.io fermé');
+      });
       server.close(() => {
-        logger.info('Serveur arr�t� proprement');
+        logger.info('Serveur arrêté proprement');
         process.exit(0);
       });
     };
@@ -33,8 +49,8 @@ const startServer = async () => {
     process.on('SIGINT', gracefulShutdown);
 
   } catch (error) {
-    logger.error('Erreur au d�marrage:', error);
-    console.error(' Erreur au d�marrage:', error);
+    logger.error('Erreur au démarrage:', error);
+    console.error('❌ Erreur au démarrage:', error);
     process.exit(1);
   }
 };
