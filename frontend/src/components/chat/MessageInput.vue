@@ -1,5 +1,35 @@
 <template>
   <div class="p-4 bg-gray-50 border-t">
+    <!-- Réponse citée -->
+    <div v-if="replyingTo" class="mb-2 p-3 bg-white rounded-lg border-l-4 border-primary flex items-start justify-between">
+      <div class="flex-1">
+        <p class="text-xs font-semibold text-primary mb-1">
+          Répondre à {{ getReplyToSender() }}
+        </p>
+        <p class="text-sm text-gray-600 truncate">
+          {{ replyingTo.content || '📎 Fichier' }}
+        </p>
+      </div>
+      <button @click="$emit('cancelReply')" class="text-gray-400 hover:text-gray-600 ml-2">
+        ✕
+      </button>
+    </div>
+
+    <!-- Mode édition -->
+    <div v-if="editingMessage" class="mb-2 p-3 bg-blue-50 rounded-lg border-l-4 border-blue-500 flex items-start justify-between">
+      <div class="flex-1">
+        <p class="text-xs font-semibold text-blue-600 mb-1">
+          ✏️ Modifier le message
+        </p>
+        <p class="text-sm text-gray-600 truncate">
+          {{ editingMessage.content }}
+        </p>
+      </div>
+      <button @click="$emit('cancelEdit')" class="text-gray-400 hover:text-gray-600 ml-2">
+        ✕
+      </button>
+    </div>
+
     <!-- ÉTAPE 7.4: Prévisualisation fichier avec annulation -->
     <div v-if="selectedFile" class="mb-3 p-3 bg-white rounded-lg border flex items-center justify-between">
       <div class="flex items-center gap-3">
@@ -98,13 +128,23 @@
 
 <script setup>
 import { ref, computed, watch } from 'vue'
+import { useAuthStore } from '@/store/auth'
 
 const props = defineProps({
-  conversationId: String
+  conversationId: String,
+  editingMessage: {
+    type: Object,
+    default: null
+  },
+  replyingTo: {
+    type: Object,
+    default: null
+  }
 })
 
-const emit = defineEmits(['messageSent', 'typing'])
+const emit = defineEmits(['messageSent', 'messageEdited', 'typing', 'cancelEdit', 'cancelReply'])
 
+const authStore = useAuthStore()
 const messageText = ref('')
 const selectedFile = ref(null)
 const showEmojiPicker = ref(false)
@@ -116,8 +156,29 @@ const typingTimeout = ref(null)
 const emojis = ['😊', '😂', '❤️', '👍', '🎉', '🔥', '😍', '🤔', '😢', '🙏', '👏', '✨', '💯', '🙌', '😎', '🥳', '😭', '💪']
 
 const canSend = computed(() => {
+  if (props.editingMessage) {
+    return messageText.value.trim().length > 0
+  }
+  // Permettre l'envoi si texte OU fichier
   return messageText.value.trim().length > 0 || selectedFile.value !== null
 })
+
+// Remplir le champ si édition
+watch(() => props.editingMessage, (msg) => {
+  if (msg) {
+    messageText.value = msg.content || ''
+    selectedFile.value = null
+    messageInput.value?.focus()
+  }
+})
+
+function getReplyToSender() {
+  if (!props.replyingTo) return ''
+  const sender = props.replyingTo.sender
+  const senderId = sender?._id || sender
+  if (senderId === authStore.user?._id) return 'vous-même'
+  return sender?.username || sender?.firstName || 'Utilisateur'
+}
 
 function getFileIcon(mimeType) {
   if (mimeType.startsWith('image/')) return '🖼️'
@@ -175,7 +236,23 @@ function handleInput() {
 
 async function sendMessage(e) {
   if (e) e.preventDefault()
-  if (!canSend.value || !props.conversationId) return
+  if (!canSend.value) return
+
+  // Mode édition
+  if (props.editingMessage) {
+    emit('messageEdited', {
+      messageId: props.editingMessage._id,
+      newContent: messageText.value.trim()
+    })
+    messageText.value = ''
+    if (messageInput.value) {
+      messageInput.value.style.height = 'auto'
+    }
+    return
+  }
+
+  // Envoi normal
+  if (!props.conversationId) return
 
   const formData = new FormData()
   
@@ -188,7 +265,17 @@ async function sendMessage(e) {
     uploadProgress.value = 1
   }
 
+  // Ajouter replyTo si présent
+  if (props.replyingTo) {
+    formData.append('replyTo', props.replyingTo._id)
+  }
+
   emit('messageSent', formData)
+
+  // Fermer mode réponse après envoi
+  if (props.replyingTo) {
+    emit('cancelReply')
+  }
 
   // Simuler progression upload
   if (selectedFile.value) {

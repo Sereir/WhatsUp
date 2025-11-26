@@ -100,7 +100,19 @@ const createConversation = async (req, res, next) => {
       
       await conversation.populate('participants', 'firstName lastName email avatar status');
       
-      logger.info(`Conversation créée entre ${req.user.email} et ${participant.email}`);
+      // Émettre événement Socket.io aux deux participants pour synchronisation
+      const io = req.app.get('io');
+      if (io) {
+        [userId, participantId].forEach(uid => {
+          io.to(`user:${uid}`).emit('conversation:updated', {
+            conversation,
+            unarchive: true,
+            restore: true
+          });
+        });
+      }
+      
+      logger.info(`Conversation créée/restaurée entre ${req.user.email} et ${participant.email}`);
       
       return res.status(201).json({
         success: true,
@@ -272,6 +284,15 @@ const toggleArchive = async (req, res, next) => {
     
     logger.info(`Conversation ${conversationId} ${isArchived ? 'archivée' : 'désarchivée'} par ${req.user.email}`);
     
+    // Émettre l'événement Socket.io
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${userId}`).emit('conversation:archived', {
+        conversationId: conversationId,
+        isArchived: isArchived
+      });
+    }
+    
     res.json({
       success: true,
       message: isArchived ? 'Conversation archivée' : 'Conversation désarchivée',
@@ -311,6 +332,14 @@ const deleteConversation = async (req, res, next) => {
     await conversation.deleteForUser(userId);
     
     logger.info(`Conversation ${conversationId} supprimée pour ${req.user.email}`);
+    
+    // Émettre l'événement Socket.io pour mettre à jour l'UI
+    const io = req.app.get('io');
+    if (io) {
+      io.to(`user:${userId}`).emit('conversation:deleted', {
+        conversationId: conversationId
+      });
+    }
     
     res.json({
       success: true,

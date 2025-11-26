@@ -130,13 +130,24 @@ conversationSchema.statics.getUserConversations = async function(userId, options
  * Méthode statique pour créer une conversation one-to-one
  */
 conversationSchema.statics.createOneToOne = async function(user1Id, user2Id) {
-  // Vérifier si une conversation existe déjà
+  // Vérifier si une conversation existe déjà (même si supprimée/archivée)
   const existing = await this.findOne({
     isGroup: false,
     participants: { $all: [user1Id, user2Id], $size: 2 }
   });
   
   if (existing) {
+    // Restaurer si elle était supprimée pour l'un ou les deux utilisateurs
+    existing.deletedBy = existing.deletedBy.filter(
+      entry => entry.user.toString() !== user1Id.toString() && entry.user.toString() !== user2Id.toString()
+    );
+    
+    // Désarchiver pour les deux utilisateurs
+    existing.archivedBy = existing.archivedBy.filter(
+      id => id.toString() !== user1Id.toString() && id.toString() !== user2Id.toString()
+    );
+    
+    await existing.save();
     return existing;
   }
   

@@ -152,6 +152,16 @@
               </p>
             </div>
           </div>
+          <!-- Bouton paramètres -->
+          <button 
+            @click="showSettings = true"
+            class="text-white hover:bg-white hover:bg-opacity-20 p-2 rounded-full transition"
+            title="Paramètres de la conversation"
+          >
+            <svg viewBox="0 0 24 24" class="w-6 h-6 fill-current">
+              <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+            </svg>
+          </button>
         </div>
 
         <!-- Affichage des messages avec scroll automatique -->
@@ -160,44 +170,102 @@
             <p>Aucun message. Commencez la conversation !</p>
           </div>
           
-          <div v-for="msg in messages" :key="msg._id" class="mb-4">
-            <div :class="['flex', isOwnMessage(msg) ? 'justify-end' : 'justify-start']">
-              <div :class="['max-w-md rounded-lg p-3 shadow', isOwnMessage(msg) ? 'bg-primary text-white' : 'bg-white']">
-                <!-- Fichiers média avec téléchargement -->
-                <div v-if="msg.mediaUrl" class="mb-2">
-                  <img 
-                    v-if="msg.mimeType?.startsWith('image/')" 
-                    :src="`http://localhost:3000${msg.mediaUrl}`" 
-                    class="rounded max-w-xs cursor-pointer hover:opacity-90"
-                    @click="openMedia(msg.mediaUrl)"
-                  />
-                  <video 
-                    v-else-if="msg.mimeType?.startsWith('video/')" 
-                    :src="`http://localhost:3000${msg.mediaUrl}`" 
-                    controls 
-                    class="rounded max-w-xs"
-                  />
-                  <a 
-                    v-else 
-                    :href="`http://localhost:3000${msg.mediaUrl}`" 
-                    :download="msg.fileName"
-                    target="_blank" 
-                    class="flex items-center gap-2 text-blue-500 hover:underline"
-                  >
-                    📎 {{ msg.fileName || msg.mediaUrl.split('/').pop() }}
-                  </a>
+          <div v-for="msg in messages" :key="msg._id" class="mb-4" :data-message-id="msg._id">
+            <div :class="['flex items-start', isOwnMessage(msg) ? 'justify-end' : 'justify-start']">
+              <div 
+                :class="['relative max-w-md rounded-lg p-3 shadow transition-all group', isOwnMessage(msg) ? 'bg-primary text-white' : 'bg-white']"
+                @contextmenu.prevent="!msg.isDeleted && showMessageActions(msg, $event)"
+              >
+                <!-- Bouton actions en haut à droite -->
+                <button
+                  v-if="!msg.isDeleted"
+                  @click.stop="showMessageActions(msg, $event)"
+                  :class="[
+                    'absolute top-1 opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-opacity-20 rounded',
+                    isOwnMessage(msg) ? 'right-1 hover:bg-white' : 'right-1 hover:bg-gray-200'
+                  ]"
+                  title="Actions"
+                >
+                  <svg viewBox="0 0 24 24" :class="['w-4 h-4', isOwnMessage(msg) ? 'fill-white' : 'fill-gray-600']">
+                    <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
+                  </svg>
+                </button>
+                <!-- Message cité -->
+                <div 
+                  v-if="msg.replyTo && !msg.isDeleted"
+                  class="mb-2 p-2 border-l-4 rounded"
+                  :class="isOwnMessage(msg) ? 'bg-white bg-opacity-20 border-white' : 'bg-gray-100 border-primary'"
+                  @click="scrollToMessage(msg.replyTo._id || msg.replyTo)"
+                  style="cursor: pointer;"
+                >
+                  <p :class="['text-xs font-semibold mb-1', isOwnMessage(msg) ? 'text-white' : 'text-primary']">
+                    {{ getReplyToSender(msg.replyTo) }}
+                  </p>
+                  <p :class="['text-sm truncate', isOwnMessage(msg) ? 'text-white text-opacity-75' : 'text-gray-600']">
+                    {{ getReplyToContent(msg.replyTo) }}
+                  </p>
                 </div>
-                
-                <!-- Contenu texte -->
-                <p v-if="msg.content" class="whitespace-pre-wrap break-words">{{ msg.content }}</p>
+
+                <!-- Message supprimé -->
+                <p v-if="msg.isDeleted" class="italic opacity-75">Ce message a été supprimé</p>
+
+                <template v-else>
+                  <!-- Image -->
+                  <div v-if="(msg.type === 'image' || msg.mimeType?.startsWith('image/')) && msg.mediaUrl" class="mb-2">
+                    <img 
+                      :src="`http://localhost:3000${msg.mediaUrl}`" 
+                      :alt="msg.fileName || 'Image'"
+                      class="max-w-full rounded cursor-pointer"
+                      style="max-height: 300px"
+                      @click="openMedia(msg.mediaUrl)"
+                    />
+                  </div>
+
+                  <!-- Vidéo -->
+                  <div v-if="(msg.type === 'video' || msg.mimeType?.startsWith('video/')) && msg.mediaUrl" class="mb-2">
+                    <video 
+                      :src="`http://localhost:3000${msg.mediaUrl}`" 
+                      controls
+                      class="max-w-full rounded"
+                      style="max-height: 300px"
+                    ></video>
+                  </div>
+
+                  <!-- Fichier (PDF, etc.) -->
+                  <div v-if="((msg.type === 'file' || msg.type === 'audio') && msg.mediaUrl) || (msg.mediaUrl && !msg.mimeType?.startsWith('image/') && !msg.mimeType?.startsWith('video/'))" class="mb-2 p-3 bg-white bg-opacity-50 rounded flex items-center gap-3">
+                    <svg viewBox="0 0 24 24" class="w-8 h-8 fill-current" :class="isOwnMessage(msg) ? 'text-white' : 'text-gray-600'">
+                      <path d="M14,2H6A2,2 0 0,0 4,4V20A2,2 0 0,0 6,22H18A2,2 0 0,0 20,20V8L14,2M18,20H6V4H13V9H18V20Z"/>
+                    </svg>
+                    <div class="flex-1 min-w-0">
+                      <p class="font-medium text-sm truncate" :class="isOwnMessage(msg) ? 'text-white' : 'text-gray-900'">{{ msg.fileName || 'Fichier' }}</p>
+                      <p class="text-xs" :class="isOwnMessage(msg) ? 'text-white text-opacity-75' : 'text-gray-500'">{{ formatFileSize(msg.mediaSize) }}</p>
+                    </div>
+                    <a 
+                      :href="`http://localhost:3000${msg.mediaUrl}`" 
+                      download
+                      class="p-2 rounded-full transition"
+                      :class="isOwnMessage(msg) ? 'hover:bg-white hover:bg-opacity-20' : 'hover:bg-gray-200'"
+                      title="Télécharger"
+                    >
+                      <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current" :class="isOwnMessage(msg) ? 'text-white' : 'text-gray-600'">
+                        <path d="M5,20H19V18H5M19,9H15V3H9V9H5L12,16L19,9Z"/>
+                      </svg>
+                    </a>
+                  </div>
+
+                  <!-- Contenu texte -->
+                  <p v-if="msg.content" class="whitespace-pre-wrap break-words">{{ msg.content }}</p>
+                </template>
                 
                 <!-- Horodatage -->
                 <p :class="['text-xs mt-1', isOwnMessage(msg) ? 'text-white text-opacity-75' : 'text-gray-500']">
                   {{ formatMessageTime(msg.createdAt) }}
+                  <span v-if="msg.isEdited || msg.edited" class="ml-1 italic">· modifié</span>
                 </p>
                 
                 <!-- Réactions (ÉTAPE 7.3) -->
                 <MessageReactions 
+                  v-if="!msg.isDeleted"
                   :message="msg" 
                   @reactionUpdated="refreshMessages"
                 />
@@ -219,7 +287,12 @@
         <!-- ÉTAPE 7.3 & 7.4: Zone de saisie avec médias -->
         <MessageInput 
           :conversationId="selectedConv._id" 
+          :editingMessage="editingMessage"
+          :replyingTo="replyingTo"
           @messageSent="handleMessageSent"
+          @messageEdited="handleMessageEdited"
+          @cancelEdit="editingMessage = null"
+          @cancelReply="replyingTo = null"
           @typing="handleTyping"
         />
       </template>
@@ -278,7 +351,7 @@
         @click="archiveConversation(contextMenu.conversation)" 
         class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700"
       >
-        📦 Archiver
+        🗄️ Archiver
       </button>
       <button 
         @click="deleteConversation(contextMenu.conversation)" 
@@ -287,6 +360,42 @@
         🗑️ Supprimer
       </button>
     </div>
+
+    <!-- Message Actions Menu -->
+    <MessageActions 
+      v-if="messageActionsMenu.show"
+      :message="messageActionsMenu.message"
+      :position="messageActionsMenu.position"
+      @close="messageActionsMenu.show = false"
+      @reply="handleReply"
+      @edit="handleEdit"
+      @delete="handleDelete"
+      @reaction="handleReaction"
+    />
+
+    <!-- Conversation Settings Panel -->
+    <Teleport to="body">
+      <div 
+        v-if="showSettings"
+        class="fixed inset-0 z-50 flex"
+      >
+        <div 
+          class="flex-1 bg-black bg-opacity-50"
+          @click="showSettings = false"
+        ></div>
+        <div class="w-96 bg-white shadow-xl">
+          <ConversationSettings 
+            :conversation="selectedConv"
+            :contact="selectedConv?.contact"
+            @close="showSettings = false"
+            @scrollToMessage="scrollToMessage"
+            @block="handleBlockContact"
+            @archive="handleArchiveConversation"
+            @delete="handleDeleteConversation"
+          />
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -297,14 +406,17 @@ import { useAuthStore } from '../store/auth'
 import { useSocket } from '../composables/useSocket'
 import { useNotifications } from '../composables/useNotifications'
 import { useRealtimeMessages } from '../composables/useRealtimeMessages'
+import { useRealtimeConversations } from '../composables/useRealtimeConversations'
 import api from '../services/api'
 import MessageReactions from '../components/chat/MessageReactions.vue'
 import MessageInput from '../components/chat/MessageInput.vue'
+import MessageActions from '../components/chat/MessageActions.vue'
+import ConversationSettings from '../components/chat/ConversationSettings.vue'
 import NotificationBadge from '../components/chat/NotificationBadge.vue'
 
 const router = useRouter()
 const authStore = useAuthStore()
-const { connect, disconnect } = useSocket()
+const { connect, disconnect, getSocket } = useSocket()
 const { 
   conversations, 
   totalUnread, 
@@ -326,10 +438,26 @@ const searchResults = ref([])
 const messagesContainer = ref(null)
 const isTyping = ref(false)
 const contextMenu = ref({ show: false, x: 0, y: 0, conversation: null })
+const allConversations = ref([]) // Toutes les conversations incluant archivées
+
+// Message actions
+const messageActionsMenu = ref({
+  show: false,
+  message: null,
+  position: { x: 0, y: 0 }
+})
+
+// Edit & Reply states
+const editingMessage = ref(null)
+const replyingTo = ref(null)
+
+// Settings panel
+const showSettings = ref(false)
 
 // Real-time setup
 const selectedConvId = computed(() => selectedConv.value?._id)
-const { setupRealtimeListeners, cleanupListeners } = useRealtimeMessages(selectedConvId, messages, scrollToBottom)
+const { setupRealtimeListeners, cleanupListeners } = useRealtimeMessages(selectedConvId, messages, scrollToBottom, isTyping)
+const { setupConversationListeners, cleanupConversationListeners } = useRealtimeConversations(conversations, loadConversations)
 
 // Conversations filtrées
 const filteredConversations = computed(() => {
@@ -403,7 +531,8 @@ async function loadProfile() {
 
 async function loadConversations() {
   try {
-    const res = await api.get('/api/conversations')
+    // Charger toutes les conversations (incluant archivées)
+    const res = await api.get('/api/conversations?includeArchived=true')
     const convs = res.data.data?.conversations || res.data.data || []
     
     // Enrichir avec le contact pour les one-to-one
@@ -413,13 +542,38 @@ async function loadConversations() {
           const pId = p._id || p
           return pId.toString() !== user.value._id.toString()
         })
-        return { ...conv, contact }
+        
+        // Déterminer si archivée pour cet utilisateur
+        const isArchivedForMe = conv.archivedBy && conv.archivedBy.some(id => 
+          (id._id || id).toString() === user.value._id.toString()
+        )
+        
+        return { ...conv, contact, isArchived: isArchivedForMe }
       }
-      return conv
+      
+      // Pour les groupes, vérifier aussi si archivé
+      const isArchivedForMe = conv.archivedBy && conv.archivedBy.some(id => 
+        (id._id || id).toString() === user.value._id.toString()
+      )
+      
+      return { ...conv, isArchived: isArchivedForMe }
     })
     
-    setConversations(enriched)
-    console.log('✅ Conversations:', enriched.length)
+    // Stocker toutes les conversations pour recherche
+    allConversations.value = enriched
+    
+    // Séparer archivées et actives
+    const activeConvs = enriched.filter(c => !c.isArchived)
+    const archivedConvs = enriched.filter(c => c.isArchived)
+    
+    // Afficher selon le filtre actuel
+    if (filter.value === 'archived') {
+      setConversations(archivedConvs)
+    } else {
+      setConversations(activeConvs)
+    }
+    
+    console.log('✅ Conversations:', activeConvs.length, 'actives,', archivedConvs.length, 'archivées')
   } catch (error) {
     console.error('❌ Erreur conversations:', error.response?.data || error.message)
   }
@@ -428,6 +582,13 @@ async function loadConversations() {
 async function selectConversation(conv) {
   selectedConv.value = conv
   resetUnread(conv._id)
+  
+  // Rejoindre la conversation via Socket.io
+  const socket = getSocket()
+  if (socket) {
+    socket.emit('conversation:join', conv._id)
+    console.log('🔌 Rejoint conversation room:', conv._id)
+  }
   
   try {
     const res = await api.get(`/api/messages/${conv._id}`)
@@ -452,6 +613,9 @@ async function handleMessageSent(formData) {
   if (!selectedConv.value) return
 
   try {
+    // Réinitialiser le compteur de notifications
+    resetUnread(selectedConv.value._id)
+    
     // Ajouter conversationId au formData
     formData.append('conversationId', selectedConv.value._id)
     
@@ -474,12 +638,17 @@ async function handleMessageSent(formData) {
 
 function handleTyping(typing) {
   // Émettre événement typing via socket
-  const socket = require('../composables/useSocket').useSocket().getSocket()
+  const socket = getSocket()
   if (socket && selectedConv.value) {
-    socket.emit('typing', {
-      conversationId: selectedConv.value._id,
-      isTyping: typing
-    })
+    if (typing) {
+      socket.emit('typing:start', {
+        conversationId: selectedConv.value._id
+      })
+    } else {
+      socket.emit('typing:stop', {
+        conversationId: selectedConv.value._id
+      })
+    }
   }
 }
 
@@ -509,25 +678,37 @@ async function searchUsers() {
 
 async function createConversation(targetUser) {
   try {
+    console.log('🆕 Création/restauration conversation avec:', targetUser.firstName)
+    
+    // Appeler l'API pour créer/restaurer la conversation
     const res = await api.post('/api/conversations', { participantId: targetUser._id })
     const newConv = res.data.data?.conversation || res.data.data
     
-    newConv.contact = targetUser
+    console.log('✅ Conversation créée/restaurée:', newConv._id)
     
-    const existingIndex = conversations.value.findIndex(c => c._id === newConv._id)
-    if (existingIndex >= 0) {
-      conversations.value[existingIndex] = newConv
-    } else {
-      conversations.value.unshift(newConv)
-    }
+    // L'événement Socket.io conversation:updated va recharger automatiquement les conversations
+    // Attendre un peu pour que le rechargement se fasse
+    await new Promise(resolve => setTimeout(resolve, 500))
     
     showNewConversation.value = false
     userSearchQuery.value = ''
     searchResults.value = []
     
-    selectConversation(newConv)
+    // Trouver et sélectionner la conversation dans la liste rechargée
+    const conv = conversations.value.find(c => c._id === newConv._id)
+    if (conv) {
+      selectConversation(conv)
+    } else {
+      // Si pas encore dans la liste, l'ajouter manuellement
+      newConv.contact = targetUser
+      conversations.value.unshift(newConv)
+      selectConversation(newConv)
+    }
+    
+    console.log('✨ Conversation sélectionnée avec historique')
   } catch (error) {
     console.error('❌ Erreur création:', error.response?.data || error.message)
+    alert('Erreur lors de la création de la conversation')
   }
 }
 
@@ -553,23 +734,145 @@ async function archiveConversation(conv) {
 }
 
 async function deleteConversation(conv) {
-  if (!confirm('Supprimer cette conversation ?')) return
+  const confirmText = 'Supprimer cette conversation ?\n\nNote: Cela masquera la conversation. Vous pourrez la restaurer en envoyant un nouveau message.'
+  if (!confirm(confirmText)) return
   
   try {
+    // Supprimer (masquer) la conversation
     await api.delete(`/api/conversations/${conv._id}`)
-    conversations.value = conversations.value.filter(c => c._id !== conv._id)
+    
+    // Retirer de la liste locale
+    const updatedConvs = conversations.value.filter(c => c._id !== conv._id)
+    setConversations(updatedConvs)
+    
+    // Retirer aussi de allConversations
+    allConversations.value = allConversations.value.filter(c => c._id !== conv._id)
+    
     if (selectedConv.value?._id === conv._id) {
       selectedConv.value = null
     }
+    
     contextMenu.value.show = false
     console.log('🗑️ Conversation supprimée')
   } catch (error) {
     console.error('❌ Erreur suppression:', error)
+    alert('Erreur lors de la suppression de la conversation')
   }
+}
+
+// Message actions
+function showMessageActions(message, event) {
+  event.stopPropagation()
+  console.log('🔧 Ouverture menu actions pour:', message)
+  messageActionsMenu.value = {
+    show: true,
+    message,
+    position: { x: event.clientX, y: event.clientY }
+  }
+  console.log('📋 Menu state:', messageActionsMenu.value)
+}
+
+function handleReply(message) {
+  replyingTo.value = message
+  messageActionsMenu.value.show = false
+}
+
+function handleEdit(message) {
+  editingMessage.value = message
+  messageActionsMenu.value.show = false
+}
+
+async function handleDelete({ messageId, deleteForEveryone }) {
+  try {
+    console.log('🗑️ Suppression confirmée côté API:', messageId, 'deleteForEveryone:', deleteForEveryone)
+    // L'UI sera mise à jour automatiquement via Socket.io (message:deleted)
+    // Ne rien faire ici, juste fermer le menu
+  } catch (error) {
+    console.error('❌ Erreur suppression message:', error)
+  }
+  messageActionsMenu.value.show = false
+}
+
+function handleReaction({ messageId, emoji }) {
+  console.log('👍 Réaction ajoutée:', emoji, 'sur message', messageId)
+}
+
+async function handleMessageEdited({ messageId, newContent }) {
+  try {
+    const res = await api.patch(`/api/messages/${messageId}`, { content: newContent })
+    const updatedMessage = res.data.data?.message || res.data.data
+    
+    const index = messages.value.findIndex(m => m._id === messageId)
+    if (index >= 0) {
+      messages.value[index] = { ...messages.value[index], ...updatedMessage, edited: true }
+    }
+    
+    editingMessage.value = null
+    console.log('✏️ Message édité')
+  } catch (error) {
+    console.error('❌ Erreur édition:', error)
+  }
+}
+
+function scrollToMessage(messageId) {
+  const messageEl = document.querySelector(`[data-message-id="${messageId}"]`)
+  if (messageEl) {
+    messageEl.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    messageEl.classList.add('highlight-message')
+    setTimeout(() => messageEl.classList.remove('highlight-message'), 2000)
+  }
+  showSettings.value = false
+}
+
+function getReplyToSender(replyTo) {
+  const msg = typeof replyTo === 'string' ? messages.value.find(m => m._id === replyTo) : replyTo
+  if (!msg) return 'Message supprimé'
+  
+  const sender = msg.sender
+  if (isOwnMessage(msg)) return 'Vous'
+  return sender?.username || sender?.firstName || 'Utilisateur'
+}
+
+function getReplyToContent(replyTo) {
+  const msg = typeof replyTo === 'string' ? messages.value.find(m => m._id === replyTo) : replyTo
+  if (!msg) return 'Message supprimé'
+  
+  if (msg.content) return msg.content
+  if (msg.mediaUrl) return '📎 Fichier'
+  return 'Message'
+}
+
+function handleBlockContact(contact) {
+  console.log('🚫 Bloquer contact:', contact)
+  showSettings.value = false
+}
+
+async function handleArchiveConversation(conversation) {
+  try {
+    console.log('📦 Archivage conversation:', conversation._id)
+    await api.patch(`/api/conversations/${conversation._id}/archive`)
+    showSettings.value = false
+    console.log('✅ Conversation archivée/désarchivée')
+  } catch (error) {
+    console.error('❌ Erreur archivage:', error)
+  }
+}
+
+function handleDeleteConversation(conversation) {
+  deleteConversation(conversation)
+  showSettings.value = false
 }
 
 function openMedia(url) {
   window.open(`http://localhost:3000${url}`, '_blank')
+}
+
+function formatFileSize(bytes) {
+  if (!bytes) return '0 B'
+  const k = 1024
+  const sizes = ['B', 'KB', 'MB', 'GB']
+  const i = Math.floor(Math.log(bytes) / Math.log(k))
+  return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i]
 }
 
 function logout() {
@@ -577,6 +880,20 @@ function logout() {
   disconnect()
   router.push('/login')
 }
+
+// Recharger les conversations quand le filtre change
+watch(() => filter.value, () => {
+  if (filter.value === 'archived') {
+    const archivedConvs = allConversations.value.filter(c => c.isArchived)
+    setConversations(archivedConvs)
+  } else if (filter.value === 'unread') {
+    const unreadConvs = allConversations.value.filter(c => !c.isArchived && getUnreadCount(c) > 0)
+    setConversations(unreadConvs)
+  } else {
+    const activeConvs = allConversations.value.filter(c => !c.isArchived)
+    setConversations(activeConvs)
+  }
+})
 
 // Fermer menu contextuel au clic
 watch(() => contextMenu.value.show, (show) => {
@@ -589,18 +906,33 @@ watch(() => contextMenu.value.show, (show) => {
   }
 })
 
+// Fermer menu actions au clic ailleurs
+watch(() => messageActionsMenu.value.show, (show) => {
+  if (show) {
+    const closeMenu = () => {
+      messageActionsMenu.value.show = false
+      document.removeEventListener('click', closeMenu)
+    }
+    setTimeout(() => document.addEventListener('click', closeMenu), 0)
+  }
+})
+
 onMounted(async () => {
   await loadProfile()
   await loadConversations()
   
   if (authStore.token) {
     connect(authStore.token)
-    setTimeout(() => setupRealtimeListeners(), 500)
+    setTimeout(() => {
+      setupRealtimeListeners()
+      setupConversationListeners()
+    }, 500)
   }
 })
 
 onBeforeUnmount(() => {
   cleanupListeners()
+  cleanupConversationListeners()
   disconnect()
 })
 </script>
@@ -609,5 +941,19 @@ onBeforeUnmount(() => {
 .bg-chat-pattern {
   background-color: #e5ddd5;
   background-image: url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23d9d9d9' fill-opacity='0.1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E");
+}
+
+/* Highlight message effect */
+:deep(.highlight-message) {
+  animation: highlight 2s ease-out;
+}
+
+@keyframes highlight {
+  0%, 100% {
+    background-color: inherit;
+  }
+  50% {
+    background-color: #fff59d !important;
+  }
 }
 </style>

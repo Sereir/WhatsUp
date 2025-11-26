@@ -102,7 +102,7 @@ const schemas = {
       .messages({
         'string.empty': 'L\'ID de conversation est requis'
       }),
-    content: Joi.string().allow('').optional(),
+    content: Joi.string().allow('', null).optional(),
     type: Joi.string().valid('text', 'image', 'video', 'file', 'audio', 'system').optional(),
     replyTo: Joi.string().optional()
   }),

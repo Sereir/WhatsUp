@@ -38,20 +38,6 @@ router.get('/search', messageController.searchMessages);
 router.get('/:conversationId', messageController.getMessages);
 
 /**
- * @route   PATCH /api/messages/:messageId
- * @desc    Éditer un message
- * @access  Private
- */
-router.patch('/:messageId', validate(schemas.editMessage), messageController.editMessage);
-
-/**
- * @route   DELETE /api/messages/:messageId
- * @desc    Supprimer un message
- * @access  Private
- */
-router.delete('/:messageId', messageController.deleteMessage);
-
-/**
  * @route   PATCH /api/messages/:messageId/read
  * @desc    Marquer un message comme lu
  * @access  Private
@@ -85,5 +71,19 @@ router.delete('/:messageId/reaction', messageController.removeReaction);
  * @access  Private
  */
 router.get('/:messageId/download', messageController.downloadFile);
+
+/**
+ * @route   PATCH /api/messages/:messageId
+ * @desc    Éditer un message
+ * @access  Private
+ */
+router.patch('/:messageId', validate(schemas.editMessage), messageController.editMessage);
+
+/**
+ * @route   DELETE /api/messages/:messageId
+ * @desc    Supprimer un message
+ * @access  Private
+ */
+router.delete('/:messageId', messageController.deleteMessage);
 
 module.exports = router;

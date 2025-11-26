@@ -20,9 +20,11 @@ if (process.env.NODE_ENV === 'production' && process.env.SENTRY_DSN) {
 }
 
 // Sécurité
-app.use(helmet());
+app.use(helmet({
+  crossOriginResourcePolicy: { policy: "cross-origin" }
+}));
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
+  origin: ['http://localhost:5173', 'http://localhost:5174'],
   credentials: true
 }));
 
@@ -37,7 +39,11 @@ app.use(mongoSanitize());
 app.use('/api/', apiLimiter);
 
 // Servir les fichiers statiques (uploads)
-app.use('/uploads', express.static(process.env.UPLOAD_PATH || './uploads'));
+app.use('/uploads', (req, res, next) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || 'http://localhost:5173');
+  res.header('Access-Control-Allow-Credentials', 'true');
+  next();
+}, express.static(process.env.UPLOAD_PATH || './uploads'));
 
 // Route de test
 app.get('/health', (req, res) => {

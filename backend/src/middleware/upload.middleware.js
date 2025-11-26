@@ -89,6 +89,6 @@ const uploadGroupAvatar = multer({
 
 module.exports = {
   uploadAvatar: uploadAvatar.single('avatar'),
-  uploadMedia: uploadMedia.single('file'),
+  uploadMedia: uploadMedia.single('media'),
   uploadGroupAvatar: uploadGroupAvatar.single('groupAvatar')
 };

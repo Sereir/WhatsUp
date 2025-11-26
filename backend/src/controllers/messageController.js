@@ -33,11 +33,20 @@ const sendMessage = async (req, res, next) => {
       });
     }
     
-    // Créer le message
+    // Vérifier qu'il y a soit du contenu, soit un fichier
+    const hasContent = content && content.trim().length > 0;
+    if (!hasContent && !req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le message doit contenir du texte ou un fichier'
+      });
+    }
+    
+    // Créer le message (contenu peut être vide si fichier média)
     const messageData = {
       conversation: conversationId,
       sender: userId,
-      content,
+      content: content || '',
       type: type || 'text',
       status: 'sent'
     };
@@ -54,6 +63,19 @@ const sendMessage = async (req, res, next) => {
       messageData.fileName = mediaInfo.fileName;
       messageData.mimeType = mediaInfo.mimeType;
       messageData.thumbnailUrl = mediaInfo.thumbnailUrl;
+      
+      // Déterminer automatiquement le type basé sur le mimeType
+      if (!type) {
+        if (mediaInfo.mimeType.startsWith('image/')) {
+          messageData.type = 'image';
+        } else if (mediaInfo.mimeType.startsWith('video/')) {
+          messageData.type = 'video';
+        } else if (mediaInfo.mimeType.startsWith('audio/')) {
+          messageData.type = 'audio';
+        } else {
+          messageData.type = 'file';
+        }
+      }
     }
     
     const message = await Message.create(messageData);
@@ -83,6 +105,14 @@ const sendMessage = async (req, res, next) => {
     const io = req.app.get('io');
     if (io) {
       emitNewMessage(io, message, conversationId);
+      
+      // Émettre conversation:updated pour désarchiver automatiquement chez le destinataire
+      for (const participantId of conversation.participants) {
+        io.to(`user:${participantId}`).emit('conversation:updated', {
+          conversation: conversation,
+          unarchive: true
+        });
+      }
       
       // Créer et émettre des notifications pour les autres participants
       for (const participantId of conversation.participants) {
@@ -256,25 +286,14 @@ const deleteMessage = async (req, res, next) => {
     }
     
     if (deleteForEveryone) {
-      // Vérifier que le message a moins de 1 heure (optionnel)
-      const oneHourAgo = new Date(Date.now() - 60 * 60 * 1000);
-      if (message.createdAt < oneHourAgo) {
-        return res.status(400).json({
-          success: false,
-          message: 'Vous ne pouvez supprimer pour tout le monde que les messages de moins d\'1 heure'
-        });
-      }
-      
       // Supprimer le fichier média si présent
       if (message.mediaUrl) {
         await deleteMediaFile(message.mediaUrl);
       }
       
       await message.deleteForEveryone();
-      logger.info(`Message ${messageId} supprimé pour tout le monde par ${req.user.email}`);
     } else {
       await message.deleteForUser(userId);
-      logger.info(`Message ${messageId} supprimé pour ${req.user.email}`);
     }
     
     // Émettre l'événement Socket.io
@@ -283,6 +302,7 @@ const deleteMessage = async (req, res, next) => {
       emitMessageDeleted(io, messageId, message.conversation, deleteForEveryone, userId);
     }
     
+    logger.info(`✅ Réponse envoyée au client`);
     res.json({
       success: true,
       message: deleteForEveryone ? 'Message supprimé pour tout le monde' : 'Message supprimé pour vous'
