@@ -1,9 +1,9 @@
 <template>
-  <div class="h-screen flex bg-gray-100">
+  <div class="h-screen flex bg-gray-100 dark:bg-gray-900">
     <!-- ÉTAPE 7.1: SIDEBAR -->
-    <div class="w-96 bg-white border-r border-gray-200 flex flex-col">
+    <div class="w-96 bg-white dark:bg-gray-800 border-r border-gray-200 dark:border-gray-700 flex flex-col">
       <!-- Header utilisateur -->
-      <div class="bg-secondary p-4 flex items-center justify-between">
+      <div class="bg-secondary dark:bg-gray-800 p-4 flex items-center justify-between">
         <div class="flex items-center gap-3 flex-1">
           <img 
             v-if="user?.avatar" 
@@ -23,9 +23,25 @@
           <NotificationBadge :count="totalUnread" />
           <button @click="showMenu = !showMenu" class="text-white hover:text-gray-200 relative">
             ⋮
-            <div v-if="showMenu" class="absolute right-0 top-8 bg-white rounded-lg shadow-lg py-2 w-48 z-10">
-              <button @click="logout" class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700">
-                🚪 Déconnexion
+            <div v-if="showMenu" class="absolute right-0 top-8 bg-white dark:bg-gray-800 rounded-lg shadow-lg py-2 w-48 z-10">
+              <button @click="goToProfile" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current">
+                  <path d="M12,4A4,4 0 0,1 16,8A4,4 0 0,1 12,12A4,4 0 0,1 8,8A4,4 0 0,1 12,4M12,14C16.42,14 20,15.79 20,18V20H4V18C4,15.79 7.58,14 12,14Z"/>
+                </svg>
+                Mon Profil
+              </button>
+              <button @click="goToSettings" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 flex items-center gap-2">
+                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current">
+                  <path d="M12,15.5A3.5,3.5 0 0,1 8.5,12A3.5,3.5 0 0,1 12,8.5A3.5,3.5 0 0,1 15.5,12A3.5,3.5 0 0,1 12,15.5M19.43,12.97C19.47,12.65 19.5,12.33 19.5,12C19.5,11.67 19.47,11.34 19.43,11L21.54,9.37C21.73,9.22 21.78,8.95 21.66,8.73L19.66,5.27C19.54,5.05 19.27,4.96 19.05,5.05L16.56,6.05C16.04,5.66 15.5,5.32 14.87,5.07L14.5,2.42C14.46,2.18 14.25,2 14,2H10C9.75,2 9.54,2.18 9.5,2.42L9.13,5.07C8.5,5.32 7.96,5.66 7.44,6.05L4.95,5.05C4.73,4.96 4.46,5.05 4.34,5.27L2.34,8.73C2.21,8.95 2.27,9.22 2.46,9.37L4.57,11C4.53,11.34 4.5,11.67 4.5,12C4.5,12.33 4.53,12.65 4.57,12.97L2.46,14.63C2.27,14.78 2.21,15.05 2.34,15.27L4.34,18.73C4.46,18.95 4.73,19.03 4.95,18.95L7.44,17.94C7.96,18.34 8.5,18.68 9.13,18.93L9.5,21.58C9.54,21.82 9.75,22 10,22H14C14.25,22 14.46,21.82 14.5,21.58L14.87,18.93C15.5,18.67 16.04,18.34 16.56,17.94L19.05,18.95C19.27,19.03 19.54,18.95 19.66,18.73L21.66,15.27C21.78,15.05 21.73,14.78 21.54,14.63L19.43,12.97Z"/>
+                </svg>
+                Paramètres
+              </button>
+              <div class="border-t dark:border-gray-700 my-1"></div>
+              <button @click="logout" class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400 flex items-center gap-2">
+                <svg viewBox="0 0 24 24" class="w-5 h-5 fill-current">
+                  <path d="M16,17V14H9V10H16V7L21,12L16,17M14,2A2,2 0 0,1 16,4V6H14V4H5V20H14V18H16V20A2,2 0 0,1 14,22H5A2,2 0 0,1 3,20V4A2,2 0 0,1 5,2H14Z"/>
+                </svg>
+                Déconnexion
               </button>
             </div>
           </button>
@@ -33,13 +49,13 @@
       </div>
 
       <!-- Recherche de conversations -->
-      <div class="p-4 border-b">
+      <div class="p-4 border-b dark:border-gray-700">
         <div class="flex gap-2">
           <input 
             v-model="searchQuery" 
             type="text" 
             placeholder="Rechercher une conversation..."
-            class="input-field flex-1"
+            class="input-field flex-1 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400"
           />
           <button
             @click="$router.push('/contacts')"
@@ -63,22 +79,22 @@
       </div>
 
       <!-- Filtrage des conversations -->
-      <div class="px-4 py-2 border-b flex gap-2">
+      <div class="px-4 py-2 border-b dark:border-gray-700 flex gap-2">
         <button 
           @click="filter = 'all'" 
-          :class="['px-3 py-1 rounded-full text-sm', filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700']"
+          :class="['px-3 py-1 rounded-full text-sm', filter === 'all' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300']"
         >
           Toutes
         </button>
         <button 
           @click="filter = 'unread'" 
-          :class="['px-3 py-1 rounded-full text-sm', filter === 'unread' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700']"
+          :class="['px-3 py-1 rounded-full text-sm', filter === 'unread' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300']"
         >
           Non lues
         </button>
         <button 
           @click="filter = 'archived'" 
-          :class="['px-3 py-1 rounded-full text-sm', filter === 'archived' ? 'bg-primary text-white' : 'bg-gray-200 text-gray-700']"
+          :class="['px-3 py-1 rounded-full text-sm', filter === 'archived' ? 'bg-primary text-white' : 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300']"
         >
           Archivées
         </button>
@@ -86,7 +102,7 @@
 
       <!-- Liste des conversations -->
       <div class="flex-1 overflow-y-auto">
-        <div v-if="filteredConversations.length === 0" class="p-8 text-center text-gray-500">
+        <div v-if="filteredConversations.length === 0" class="p-8 text-center text-gray-500 dark:text-gray-400">
           <p class="mb-4">Aucune conversation</p>
           <button @click="showNewConversation = true" class="btn-primary">+ Nouvelle conversation</button>
         </div>
@@ -96,8 +112,8 @@
           @click="selectConversation(conv)"
           @contextmenu.prevent="showConvOptions(conv, $event)"
           :class="[
-            'p-4 border-b cursor-pointer hover:bg-gray-50 transition',
-            selectedConv?._id === conv._id ? 'bg-light' : ''
+            'p-4 border-b dark:border-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition',
+            selectedConv?._id === conv._id ? 'bg-light dark:bg-gray-700' : ''
           ]"
         >
           <div class="flex items-center gap-3">
@@ -154,7 +170,7 @@
     <!-- ÉTAPE 7.2: ZONE DE CHAT -->
     <div class="flex-1 flex flex-col">
       <!-- État vide -->
-      <div v-if="!selectedConv" class="flex-1 flex items-center justify-center text-gray-500">
+      <div v-if="!selectedConv" class="flex-1 flex items-center justify-center text-gray-500 dark:text-gray-400">
         <div class="text-center">
           <p class="text-2xl mb-2">💬</p>
           <p>Sélectionnez une conversation pour commencer</p>
@@ -163,7 +179,7 @@
 
       <template v-else>
         <!-- Header de la conversation -->
-        <div class="bg-secondary p-4 flex items-center justify-between border-b">
+        <div class="bg-secondary dark:bg-gray-800 p-4 flex items-center justify-between border-b dark:border-gray-700">
           <div class="flex items-center gap-3">
             <div class="relative">
               <!-- Avatar groupe -->
@@ -212,8 +228,8 @@
         </div>
 
         <!-- Affichage des messages avec scroll automatique -->
-        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 bg-chat-pattern">
-          <div v-if="messages.length === 0" class="text-center text-gray-500 py-8">
+        <div ref="messagesContainer" class="flex-1 overflow-y-auto p-4 bg-chat-pattern dark:bg-gray-900">
+          <div v-if="messages.length === 0" class="text-center text-gray-500 dark:text-gray-400 py-8">
             <p>Aucun message. Commencez la conversation !</p>
           </div>
           
@@ -368,27 +384,27 @@
 
     <!-- Modal Nouvelle Conversation -->
     <div v-if="showNewConversation" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50" @click.self="showNewConversation = false">
-      <div class="bg-white rounded-lg p-6 w-96">
-        <h3 class="text-xl font-bold mb-4">Nouvelle conversation</h3>
+      <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-96">
+        <h3 class="text-xl font-bold mb-4 text-gray-900 dark:text-white">Nouvelle conversation</h3>
         <input 
           v-model="userSearchQuery" 
           type="text" 
           placeholder="Rechercher un utilisateur..."
-          class="input-field w-full mb-4"
+          class="input-field w-full mb-4 dark:bg-gray-700 dark:text-white dark:border-gray-600 dark:placeholder-gray-400"
           @input="searchUsers"
         />
         <div class="max-h-64 overflow-y-auto mb-4">
-          <div v-if="searchResults.length === 0 && userSearchQuery.length >= 2" class="text-center text-gray-500 py-4">
+          <div v-if="searchResults.length === 0 && userSearchQuery.length >= 2" class="text-center text-gray-500 dark:text-gray-400 py-4">
             Aucun utilisateur trouvé
           </div>
-          <div v-else-if="searchResults.length === 0" class="text-center text-gray-400 py-4 text-sm">
+          <div v-else-if="searchResults.length === 0" class="text-center text-gray-400 dark:text-gray-500 py-4 text-sm">
             Tapez au moins 2 caractères pour rechercher
           </div>
           <div 
             v-for="u in searchResults" 
             :key="u._id"
             @click="createConversation(u)"
-            class="p-3 hover:bg-gray-100 cursor-pointer rounded flex items-center gap-3"
+            class="p-3 hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer rounded flex items-center gap-3"
           >
             <img 
               v-if="u.avatar" 
@@ -412,18 +428,18 @@
     <div 
       v-if="contextMenu.show" 
       :style="{ top: contextMenu.y + 'px', left: contextMenu.x + 'px' }"
-      class="fixed bg-white shadow-lg rounded-lg py-2 w-48 z-50"
+      class="fixed bg-white dark:bg-gray-800 shadow-lg rounded-lg py-2 w-48 z-50"
       @click.stop
     >
       <button 
         @click="archiveConversation(contextMenu.conversation)" 
-        class="w-full text-left px-4 py-2 hover:bg-gray-100 text-gray-700"
+        class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200"
       >
         🗄️ Archiver
       </button>
       <button 
         @click="deleteConversation(contextMenu.conversation)" 
-        class="w-full text-left px-4 py-2 hover:bg-gray-100 text-red-600"
+        class="w-full text-left px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 text-red-600 dark:text-red-400"
       >
         🗑️ Supprimer
       </button>
@@ -477,6 +493,7 @@ import { useSocket } from '../composables/useSocket'
 import { useNotifications } from '../composables/useNotifications'
 import { useRealtimeMessages } from '../composables/useRealtimeMessages'
 import { useRealtimeConversations } from '../composables/useRealtimeConversations'
+import { useTheme } from '../composables/useTheme'
 import api from '../services/api'
 import MessageReactions from '../components/chat/MessageReactions.vue'
 import MessageInput from '../components/chat/MessageInput.vue'
@@ -494,6 +511,8 @@ const {
   resetUnread, 
   setConversations 
 } = useNotifications()
+// Initialiser le thème
+useTheme()
 
 // État
 const user = ref(null)
@@ -1011,6 +1030,16 @@ function logout() {
   authStore.logout()
   disconnect()
   router.push('/login')
+}
+
+function goToProfile() {
+  showMenu.value = false
+  router.push('/profile')
+}
+
+function goToSettings() {
+  showMenu.value = false
+  router.push('/settings')
 }
 
 // Recharger les conversations quand le filtre change

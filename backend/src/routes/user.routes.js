@@ -23,6 +23,13 @@ router.get('/search', userController.searchUsers);
 router.patch('/profile', validate(schemas.updateProfile), userController.updateProfile);
 
 /**
+ * @route   PATCH /api/users/bio
+ * @desc    Mettre à jour le bio
+ * @access  Private
+ */
+router.patch('/bio', userController.updateBio);
+
+/**
  * @route   POST /api/users/avatar
  * @desc    Upload avatar
  * @access  Private

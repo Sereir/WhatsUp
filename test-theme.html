@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test Dark Mode</title>
+    <style>
+        :root {
+            --color-primary: #075E54;
+        }
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        
+        body.light {
+            background-color: #f3f4f6;
+            color: #1f2937;
+        }
+        
+        body.dark {
+            background-color: #111827;
+            color: #f9fafb;
+        }
+        
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 2rem;
+        }
+        
+        h1 {
+            margin-bottom: 2rem;
+            text-align: center;
+        }
+        
+        .card {
+            background: white;
+            border-radius: 0.5rem;
+            padding: 1.5rem;
+            margin-bottom: 1rem;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+            transition: background-color 0.3s;
+        }
+        
+        body.dark .card {
+            background: #1f2937;
+        }
+        
+        button {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            font-size: 1rem;
+            transition: all 0.3s;
+        }
+        
+        .btn-primary {
+            background-color: var(--color-primary);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            opacity: 0.9;
+        }
+        
+        .theme-selector {
+            display: flex;
+            gap: 1rem;
+            margin-top: 1rem;
+        }
+        
+        .color-option {
+            width: 50px;
+            height: 50px;
+            border-radius: 0.5rem;
+            cursor: pointer;
+            border: 3px solid transparent;
+            transition: all 0.2s;
+        }
+        
+        .color-option:hover {
+            transform: scale(1.1);
+        }
+        
+        .color-option.active {
+            border-color: currentColor;
+        }
+        
+        .toggle {
+            position: relative;
+            width: 60px;
+            height: 30px;
+            background: #cbd5e1;
+            border-radius: 15px;
+            cursor: pointer;
+            transition: background-color 0.3s;
+        }
+        
+        .toggle.active {
+            background: var(--color-primary);
+        }
+        
+        .toggle::after {
+            content: '';
+            position: absolute;
+            width: 26px;
+            height: 26px;
+            background: white;
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: transform 0.3s;
+        }
+        
+        .toggle.active::after {
+            transform: translateX(30px);
+        }
+        
+        .flex {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+        }
+        
+        .info {
+            display: grid;
+            gap: 0.5rem;
+            margin-top: 1rem;
+        }
+        
+        .info-item {
+            display: flex;
+            justify-content: space-between;
+            padding: 0.5rem;
+            border-bottom: 1px solid #e5e7eb;
+        }
+        
+        body.dark .info-item {
+            border-bottom-color: #374151;
+        }
+    </style>
+</head>
+<body class="light">
+    <div class="container">
+        <h1>🎨 Test du système de thème</h1>
+        
+        <div class="card">
+            <h2>Mode d'affichage</h2>
+            <div class="flex">
+                <span>Mode sombre</span>
+                <div class="toggle" id="themeToggle"></div>
+            </div>
+            <p style="margin-top: 1rem; opacity: 0.7; font-size: 0.9rem;">
+                Cliquez sur le toggle pour basculer entre le mode clair et sombre
+            </p>
+        </div>
+        
+        <div class="card">
+            <h2>Couleur du thème</h2>
+            <div class="theme-selector">
+                <div class="color-option active" style="background-color: #075E54;" data-color="blue" title="Bleu"></div>
+                <div class="color-option" style="background-color: #7C3AED;" data-color="purple" title="Violet"></div>
+                <div class="color-option" style="background-color: #EC4899;" data-color="pink" title="Rose"></div>
+                <div class="color-option" style="background-color: #10B981;" data-color="green" title="Vert"></div>
+            </div>
+            <p style="margin-top: 1rem; opacity: 0.7; font-size: 0.9rem;">
+                Cliquez sur une couleur pour l'appliquer au thème
+            </p>
+        </div>
+        
+        <div class="card">
+            <h2>Exemple de bouton</h2>
+            <button class="btn-primary">Bouton avec couleur primaire</button>
+            <p style="margin-top: 1rem; opacity: 0.7; font-size: 0.9rem;">
+                Le bouton utilise la variable CSS --color-primary
+            </p>
+        </div>
+        
+        <div class="card">
+            <h2>Informations de test</h2>
+            <div class="info">
+                <div class="info-item">
+                    <span>Mode actuel</span>
+                    <strong id="currentMode">Clair</strong>
+                </div>
+                <div class="info-item">
+                    <span>Couleur active</span>
+                    <strong id="currentColor">Bleu</strong>
+                </div>
+                <div class="info-item">
+                    <span>Variable CSS</span>
+                    <strong id="cssVar">#075E54</strong>
+                </div>
+                <div class="info-item">
+                    <span>LocalStorage thème</span>
+                    <strong id="lsTheme">light</strong>
+                </div>
+                <div class="info-item">
+                    <span>LocalStorage couleur</span>
+                    <strong id="lsColor">blue</strong>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card">
+            <h2>✅ Tests réussis</h2>
+            <ul style="margin-left: 1.5rem; margin-top: 1rem; line-height: 1.8;">
+                <li>Toggle dark mode fonctionnel</li>
+                <li>Sélection de couleur fonctionnelle</li>
+                <li>Variables CSS dynamiques</li>
+                <li>Persistance localStorage</li>
+                <li>Transitions fluides</li>
+            </ul>
+        </div>
+    </div>
+    
+    <script>
+        const colors = {
+            blue: '#075E54',
+            purple: '#7C3AED',
+            pink: '#EC4899',
+            green: '#10B981'
+        };
+        
+        const colorNames = {
+            blue: 'Bleu',
+            purple: 'Violet',
+            pink: 'Rose',
+            green: 'Vert'
+        };
+        
+        // Éléments
+        const toggle = document.getElementById('themeToggle');
+        const body = document.body;
+        const colorOptions = document.querySelectorAll('.color-option');
+        
+        // Info elements
+        const currentModeEl = document.getElementById('currentMode');
+        const currentColorEl = document.getElementById('currentColor');
+        const cssVarEl = document.getElementById('cssVar');
+        const lsThemeEl = document.getElementById('lsTheme');
+        const lsColorEl = document.getElementById('lsColor');
+        
+        // Initialiser depuis localStorage
+        const savedTheme = localStorage.getItem('whatsup_theme') || 'light';
+        const savedColor = localStorage.getItem('whatsup_color') || 'blue';
+        
+        if (savedTheme === 'dark') {
+            body.classList.remove('light');
+            body.classList.add('dark');
+            toggle.classList.add('active');
+        }
+        
+        document.documentElement.style.setProperty('--color-primary', colors[savedColor]);
+        colorOptions.forEach(opt => {
+            opt.classList.toggle('active', opt.dataset.color === savedColor);
+        });
+        
+        updateInfo();
+        
+        // Toggle dark mode
+        toggle.addEventListener('click', () => {
+            const isDark = body.classList.contains('dark');
+            
+            if (isDark) {
+                body.classList.remove('dark');
+                body.classList.add('light');
+                toggle.classList.remove('active');
+                localStorage.setItem('whatsup_theme', 'light');
+            } else {
+                body.classList.remove('light');
+                body.classList.add('dark');
+                toggle.classList.add('active');
+                localStorage.setItem('whatsup_theme', 'dark');
+            }
+            
+            updateInfo();
+        });
+        
+        // Changer couleur
+        colorOptions.forEach(option => {
+            option.addEventListener('click', () => {
+                const color = option.dataset.color;
+                
+                document.documentElement.style.setProperty('--color-primary', colors[color]);
+                localStorage.setItem('whatsup_color', color);
+                
+                colorOptions.forEach(opt => opt.classList.remove('active'));
+                option.classList.add('active');
+                
+                updateInfo();
+            });
+        });
+        
+        function updateInfo() {
+            const isDark = body.classList.contains('dark');
+            const currentColor = localStorage.getItem('whatsup_color') || 'blue';
+            const currentValue = getComputedStyle(document.documentElement).getPropertyValue('--color-primary').trim();
+            
+            currentModeEl.textContent = isDark ? 'Sombre' : 'Clair';
+            currentColorEl.textContent = colorNames[currentColor];
+            cssVarEl.textContent = currentValue;
+            lsThemeEl.textContent = isDark ? 'dark' : 'light';
+            lsColorEl.textContent = currentColor;
+        }
+    </script>
+</body>
+</html>

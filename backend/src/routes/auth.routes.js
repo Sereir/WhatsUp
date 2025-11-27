@@ -33,4 +33,11 @@ router.post('/logout', authMiddleware, authController.logout);
  */
 router.get('/me', authMiddleware, authController.getCurrentUser);
 
+/**
+ * @route   PUT /api/auth/password
+ * @desc    Changer le mot de passe
+ * @access  Private
+ */
+router.put('/password', authMiddleware, authController.changePassword);
+
 module.exports = router;

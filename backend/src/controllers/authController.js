@@ -202,9 +202,48 @@ const getCurrentUser = async (req, res, next) => {
   }
 };
 
+/**
+ * Changer le mot de passe
+ */
+const changePassword = async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+    
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: 'Le nouveau mot de passe doit contenir au moins 6 caractères'
+      });
+    }
+    
+    // Mettre à jour le mot de passe
+    req.user.password = newPassword;
+    await req.user.save();
+    
+    // Créer une alerte de sécurité
+    await SecurityAlertService.logPasswordChange(req.user._id, req);
+    
+    addBreadcrumb('auth', 'Password changed', 'info', {
+      userId: req.user._id.toString()
+    });
+    
+    logger.info(`Mot de passe changé: ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Mot de passe modifié avec succès'
+    });
+    
+  } catch (error) {
+    logger.error('Erreur changePassword:', error);
+    next(error);
+  }
+};
+
 module.exports = {
   register,
   login,
   logout,
-  getCurrentUser
+  getCurrentUser,
+  changePassword
 };

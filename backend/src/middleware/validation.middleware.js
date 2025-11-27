@@ -64,7 +64,13 @@ const schemas = {
   updateProfile: Joi.object({
     firstName: Joi.string().trim().max(50).optional(),
     lastName: Joi.string().trim().max(50).optional(),
-    bio: Joi.string().max(200).allow('').optional()
+    bio: Joi.string().max(200).allow('').optional(),
+    username: Joi.string().trim().min(3).max(20).pattern(/^[a-zA-Z0-9_]+$/).optional()
+      .messages({
+        'string.min': 'Le pseudo doit contenir au moins 3 caractères',
+        'string.max': 'Le pseudo ne peut pas dépasser 20 caractères',
+        'string.pattern.base': 'Le pseudo ne peut contenir que des lettres, chiffres et underscores'
+      })
   }),
   
   updateStatus: Joi.object({

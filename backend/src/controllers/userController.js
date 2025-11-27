@@ -89,12 +89,37 @@ const getUserProfile = async (req, res, next) => {
  */
 const updateProfile = async (req, res, next) => {
   try {
-    const { firstName, lastName, bio } = req.body;
+    const { firstName, lastName, bio, username } = req.body;
     
     const updateData = {};
     if (firstName) updateData.firstName = firstName;
     if (lastName) updateData.lastName = lastName;
     if (bio !== undefined) updateData.bio = bio;
+    
+    // Gérer la mise à jour du username avec validation de l'unicité
+    if (username !== undefined && username !== req.user.username) {
+      if (!username || username.trim().length < 3) {
+        return res.status(400).json({
+          success: false,
+          message: 'Le pseudo doit contenir au moins 3 caractères'
+        });
+      }
+      
+      // Vérifier si le username est déjà pris
+      const existingUser = await User.findOne({ 
+        username: username.trim(), 
+        _id: { $ne: req.user._id } 
+      });
+      
+      if (existingUser) {
+        return res.status(400).json({
+          success: false,
+          message: 'Ce pseudo est déjà utilisé'
+        });
+      }
+      
+      updateData.username = username.trim();
+    }
     
     const user = await User.findByIdAndUpdate(
       req.user._id,
@@ -120,6 +145,32 @@ const updateProfile = async (req, res, next) => {
     
   } catch (error) {
     logger.error('Erreur updateProfile:', error);
+    next(error);
+  }
+};
+
+/**
+ * Mettre à jour le bio uniquement
+ */
+const updateBio = async (req, res, next) => {
+  try {
+    const { bio } = req.body;
+    
+    req.user.bio = bio || '';
+    await req.user.save();
+    
+    logger.info(`Bio mis à jour: ${req.user.email}`);
+    
+    res.json({
+      success: true,
+      message: 'Bio mis à jour',
+      data: {
+        bio: req.user.bio
+      }
+    });
+    
+  } catch (error) {
+    logger.error('Erreur updateBio:', error);
     next(error);
   }
 };
@@ -270,5 +321,6 @@ module.exports = {
   searchUsers,
   updateStatus,
   deleteAccount,
-  updateUsername
+  updateUsername,
+  updateBio
 };
