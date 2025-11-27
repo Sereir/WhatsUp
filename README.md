@@ -6,7 +6,7 @@ Application de messagerie instantanée moderne avec support multimédia, convers
 [![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
 [![Node.js Version](https://img.shields.io/badge/node-%3E%3D18.0.0-brightgreen)](https://nodejs.org)
 
-## 📋 Table des matières
+## Table des matières
 
 - [Fonctionnalités](#-fonctionnalités)
 - [Architecture](#-architecture)
@@ -18,31 +18,31 @@ Application de messagerie instantanée moderne avec support multimédia, convers
 - [Contribution](#-contribution)
 - [Licence](#-licence)
 
-## ✨ Fonctionnalités
+## Fonctionnalités
 
 ### Messagerie
-- 💬 **Conversations privées** - Messages 1-to-1 en temps réel
-- 👥 **Groupes** - Créez et gérez des conversations de groupe
-- 📎 **Multimédia** - Envoi d'images, vidéos, fichiers
-- ⚡ **Temps réel** - Synchronisation instantanée via WebSocket
-- ✅ **Statuts** - Vu, livré, en cours d'envoi
-- 😊 **Réactions** - Réagissez aux messages avec des emojis
-- ✏️ **Édition** - Modifiez vos messages envoyés
-- 🗑️ **Suppression** - Supprimez vos messages
+- **Conversations privées** - Messages 1-to-1 en temps réel
+- **Groupes** - Créez et gérez des conversations de groupe
+- **Multimédia** - Envoi d'images, vidéos, fichiers
+- **Temps réel** - Synchronisation instantanée via WebSocket
+- **Statuts** - Vu, livré, en cours d'envoi
+- **Réactions** - Réagissez aux messages avec des emojis
+- **Édition** - Modifiez vos messages envoyés
+- **Suppression** - Supprimez vos messages
 
 ### Utilisateurs
-- 🔐 **Authentification JWT** - Connexion sécurisée
-- 👤 **Profils** - Avatar, bio, statut personnalisé
-- 📱 **Multi-sessions** - Connectez-vous sur plusieurs appareils
-- 🔔 **Notifications** - Notifications push en temps réel
-- 🛡️ **Sécurité** - Alertes de sécurité, détection d'activité suspecte
+- **Authentification JWT** - Connexion sécurisée
+- **Profils** - Avatar, bio, statut personnalisé
+- **Multi-sessions** - Connectez-vous sur plusieurs appareils
+- **Notifications** - Notifications push en temps réel
+- **Sécurité** - Alertes de sécurité, détection d'activité suspecte
 
 ### Contacts
-- 📇 **Gestion contacts** - Ajoutez et bloquez des utilisateurs
-- 🟢 **Statut en ligne** - Voyez qui est connecté
-- 🕐 **Dernière connexion** - Heure de dernière activité
+- **Gestion contacts** - Ajoutez et bloquez des utilisateurs
+- **Statut en ligne** - Voyez qui est connecté
+- **Dernière connexion** - Heure de dernière activité
 
-## 🏗️ Architecture
+## Architecture
 
 ```
 WhatsUp/
@@ -94,7 +94,7 @@ WhatsUp/
 - **Nginx** - Reverse proxy
 - **Sentry** - Monitoring des erreurs
 
-## 🚀 Installation
+## Installation
 
 ### Prérequis
 
@@ -139,7 +139,7 @@ JWT_REFRESH_SECRET=votre-autre-secret-different
 CORS_ORIGIN=http://localhost:5173
 ```
 
-> ⚠️ **Sécurité**: Générez des secrets forts pour la production! Voir [docs/SECRETS.md](docs/SECRETS.md)
+> **Sécurité**: Générez des secrets forts pour la production! Voir [docs/SECRETS.md](docs/SECRETS.md)
 
 ### Démarrage
 
@@ -165,7 +165,7 @@ npm run dev
 docker-compose -f docker-compose.dev.yml up
 ```
 
-## 🐳 Déploiement
+## Déploiement
 
 ### Déploiement rapide avec Docker
 
@@ -203,13 +203,13 @@ Le pipeline CI/CD s'exécute automatiquement sur:
 - Pull requests
 
 **Pipeline:**
-1. ✅ Lint (ESLint backend + frontend)
-2. ✅ Tests (Jest + Vitest)
-3. 🐳 Build Docker images
-4. 🔐 Security scanning (Trivy)
-5. 🚀 Déploiement automatique (si configuré)
+1. Lint (ESLint backend + frontend)
+2. Tests (Jest + Vitest)
+3. Build Docker images
+4. Security scanning (Trivy)
+5. Déploiement automatique (si configuré)
 
-## 📚 Documentation
+## Documentation
 
 - **[Architecture](docs/01-architecture-messagerie.md)** - Vue d'ensemble de l'architecture
 - **[Structure technique](docs/02-structure-technique.md)** - Organisation du code
@@ -219,7 +219,7 @@ Le pipeline CI/CD s'exécute automatiquement sur:
 - **[Déploiement](README.deployment.md)** - Guide de déploiement complet
 - **[Secrets](docs/SECRETS.md)** - Gestion des secrets et sécurité
 
-## 🧪 Tests
+## Tests
 
 ### Backend
 
@@ -262,7 +262,7 @@ npm run lint
 - **Backend**: 52.88% statements, 32.98% branches
 - **Frontend**: 21.61% statements, 12.41% branches
 
-> 🎯 **Objectif**: 70%+ de couverture
+> **Objectif**: 70%+ de couverture
 
 ## 🔧 Scripts utiles
 
@@ -293,7 +293,7 @@ docker-compose restart
 .\scripts\monitor.ps1
 ```
 
-## 🐛 Troubleshooting
+## Troubleshooting
 
 ### MongoDB ne démarre pas
 
@@ -327,7 +327,7 @@ docker-compose up -d frontend
 docker-compose logs frontend
 ```
 
-## 🤝 Contribution
+## Contribution
 
 Les contributions sont les bienvenues !
 
@@ -350,28 +350,6 @@ Les contributions sont les bienvenues !
 - **Code**: ESLint + Prettier
 - **Tests**: Écrire des tests pour les nouvelles fonctionnalités
 
-## 📄 Licence
+## Licence
 
 Ce projet est sous licence MIT. Voir le fichier [LICENSE](LICENSE) pour plus de détails.
-
-## 👥 Auteurs
-
-- **Votre Nom** - [@yourusername](https://github.com/yourusername)
-
-## 🙏 Remerciements
-
-- [Vue.js](https://vuejs.org/)
-- [Express](https://expressjs.com/)
-- [Socket.io](https://socket.io/)
-- [MongoDB](https://www.mongodb.com/)
-- [Tailwind CSS](https://tailwindcss.com/)
-
-## 📞 Support
-
-- 📧 Email: support@whatsup.com
-- 🐛 Issues: [GitHub Issues](https://github.com/yourusername/WhatsUp/issues)
-- 💬 Discord: [Rejoindre notre serveur](https://discord.gg/whatsup)
-
----
-
-**Made with ❤️ by the WhatsUp Team**
