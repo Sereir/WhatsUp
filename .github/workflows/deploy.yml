@@ -1,0 +1,67 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - main
+      - master
+    tags:
+      - 'v*'
+
+jobs:
+  deploy:
+    name: Deploy to Server
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Setup SSH
+      uses: webfactory/ssh-agent@v0.8.0
+      with:
+        ssh-private-key: ${{ secrets.SSH_PRIVATE_KEY }}
+
+    - name: Add server to known hosts
+      run: |
+        mkdir -p ~/.ssh
+        ssh-keyscan -H ${{ secrets.SERVER_HOST }} >> ~/.ssh/known_hosts
+
+    - name: Deploy to server
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        APP_PATH: ${{ secrets.APP_PATH }}
+      run: |
+        ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+          cd ${{ secrets.APP_PATH }}
+          git pull origin main
+          docker-compose down
+          docker-compose build --no-cache
+          docker-compose up -d
+          docker-compose ps
+        EOF
+
+    - name: Health Check
+      run: |
+        sleep 30
+        curl -f https://${{ secrets.SERVER_HOST }}/health || exit 1
+
+    - name: Notify deployment
+      if: success()
+      run: echo "✅ Deployment successful!"
+
+    - name: Rollback on failure
+      if: failure()
+      env:
+        SERVER_HOST: ${{ secrets.SERVER_HOST }}
+        SERVER_USER: ${{ secrets.SERVER_USER }}
+        APP_PATH: ${{ secrets.APP_PATH }}
+      run: |
+        ssh $SERVER_USER@$SERVER_HOST << 'EOF'
+          cd ${{ secrets.APP_PATH }}
+          git reset --hard HEAD^
+          docker-compose down
+          docker-compose up -d
+        EOF
+        echo "❌ Deployment failed, rolled back to previous version"

@@ -350,8 +350,7 @@
                 <!-- Réactions (ÉTAPE 7.3) -->
                 <MessageReactions 
                   v-if="!msg.isDeleted"
-                  :message="msg" 
-                  @reactionUpdated="refreshMessages"
+                  :message="msg"
                 />
               </div>
             </div>
@@ -1088,17 +1087,18 @@ onMounted(async () => {
     // Attendre que le socket soit connecté
     const socket = getSocket()
     if (socket) {
-      // Attendre l'événement de connexion
-      socket.once('connect', () => {
-        console.log('🔌 Socket connecté, configuration des listeners...')
-        setupRealtimeListeners()
-        setupConversationListeners()
-      })
-      
-      // Si déjà connecté
+      // Si déjà connecté, configurer immédiatement
       if (socket.connected) {
+        console.log('🔌 Socket déjà connecté, configuration des listeners...')
         setupRealtimeListeners()
         setupConversationListeners()
+      } else {
+        // Sinon, attendre l'événement de connexion
+        socket.once('connect', () => {
+          console.log('🔌 Socket connecté, configuration des listeners...')
+          setupRealtimeListeners()
+          setupConversationListeners()
+        })
       }
     }
   }

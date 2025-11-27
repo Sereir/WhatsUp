@@ -1,4 +1,5 @@
 import { useSocket } from './useSocket'
+import { watch } from 'vue'
 
 export function useRealtimeMessages(selectedConversationId, messages, onNewMessage, isTyping) {
   const { getSocket } = useSocket()
@@ -13,11 +14,17 @@ export function useRealtimeMessages(selectedConversationId, messages, onNewMessa
     // Nouveau message
     socket.on('message:new', async (data) => {
       console.log('📨 Nouveau message reçu:', data)
+      console.log('📍 Conversation actuelle:', selectedConversationId.value)
+      console.log('📍 Message pour conversation:', data.conversationId)
       
+      // Utiliser .value pour accéder à la valeur du computed
       if (data.conversationId === selectedConversationId.value) {
+        console.log('✅ Message pour la conversation active')
+        
         // Vérifier si le message n'existe pas déjà (éviter les doublons)
         const exists = messages.value.find(m => m._id === data.message._id)
         if (!exists) {
+          console.log('➕ Ajout du message à la liste')
           messages.value.push(data.message)
           
           // Marquer comme lu immédiatement puisqu'on est sur la conversation
@@ -33,7 +40,11 @@ export function useRealtimeMessages(selectedConversationId, messages, onNewMessa
           if (onNewMessage) {
             onNewMessage()
           }
+        } else {
+          console.log('⚠️ Message déjà présent dans la liste')
         }
+      } else {
+        console.log('ℹ️ Message pour une autre conversation (notification)')
       }
     })
 

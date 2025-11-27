@@ -1,0 +1,154 @@
+/**
+ * Tests unitaires du modèle Conversation
+ */
+
+const mongoose = require('mongoose');
+const Conversation = require('../../src/models/Conversation');
+const User = require('../../src/models/User');
+const { connectDatabase, clearDatabase, closeDatabase } = require('../helpers/dbSetup');
+const { createTestUser, createTestUsers } = require('../helpers/testHelpers');
+
+describe('Conversation Model', () => {
+  beforeAll(async () => {
+    await connectDatabase();
+  });
+
+  afterAll(async () => {
+    await closeDatabase();
+  });
+
+  beforeEach(async () => {
+    await clearDatabase();
+  });
+
+  describe('Conversation Creation', () => {
+    it('devrait créer une conversation privée', async () => {
+      const [user1, user2] = await createTestUsers(2);
+
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id],
+        isGroup: false
+      });
+
+      expect(conversation).toBeDefined();
+      expect(conversation.participants).toHaveLength(2);
+      expect(conversation.isGroup).toBe(false);
+      expect(conversation.isArchived).toBe(false);
+    });
+
+    it('devrait créer une conversation de groupe', async () => {
+      const [user1, user2, user3] = await createTestUsers(3);
+
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id, user3._id],
+        isGroup: true,
+        name: 'Test Group',
+        groupAdmin: user1._id
+      });
+
+      expect(conversation.isGroup).toBe(true);
+      expect(conversation.name).toBe('Test Group');
+      expect(conversation.groupAdmin.toString()).toBe(user1._id.toString());
+      expect(conversation.participants).toHaveLength(3);
+    });
+
+    it('ne devrait pas créer une conversation sans participants', async () => {
+      await expect(Conversation.create({
+        participants: [],
+        isGroup: false
+      })).rejects.toThrow();
+    });
+  });
+
+  describe('Conversation Archive', () => {
+    it('devrait archiver une conversation', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id],
+        isGroup: false
+      });
+
+      conversation.isArchived = true;
+      await conversation.save();
+
+      expect(conversation.isArchived).toBe(true);
+    });
+  });
+
+  describe('Group Members', () => {
+    it('devrait ajouter un membre au groupe', async () => {
+      const [user1, user2, user3] = await createTestUsers(3);
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id],
+        isGroup: true,
+        name: 'Test Group',
+        groupAdmin: user1._id
+      });
+
+      await conversation.addMember(user3._id);
+
+      expect(conversation.participants).toHaveLength(3);
+      expect(conversation.participants.map(p => p.toString())).toContain(user3._id.toString());
+    });
+
+    it('ne devrait pas ajouter un membre déjà présent', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id],
+        isGroup: true,
+        name: 'Test Group',
+        groupAdmin: user1._id
+      });
+
+      await conversation.addMember(user2._id);
+
+      expect(conversation.participants).toHaveLength(2);
+    });
+
+    it('devrait retirer un membre du groupe', async () => {
+      const [user1, user2, user3] = await createTestUsers(3);
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id, user3._id],
+        isGroup: true,
+        name: 'Test Group',
+        groupAdmin: user1._id
+      });
+
+      await conversation.removeMember(user3._id);
+
+      expect(conversation.participants).toHaveLength(2);
+      expect(conversation.participants.map(p => p.toString())).not.toContain(user3._id.toString());
+    });
+
+    it('ne devrait pas retirer l\'admin du groupe', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id],
+        isGroup: true,
+        name: 'Test Group',
+        groupAdmin: user1._id
+      });
+
+      await expect(conversation.removeMember(user1._id)).rejects.toThrow();
+    });
+  });
+
+  describe('Group Settings', () => {
+    it('devrait mettre à jour les paramètres du groupe', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await Conversation.create({
+        participants: [user1._id, user2._id],
+        isGroup: true,
+        name: 'Test Group',
+        groupAdmin: user1._id
+      });
+
+      conversation.name = 'Updated Group Name';
+      conversation.description = 'New description';
+      await conversation.save();
+
+      expect(conversation.name).toBe('Updated Group Name');
+      expect(conversation.description).toBe('New description');
+    });
+  });
+});

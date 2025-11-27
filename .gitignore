@@ -1,22 +1,66 @@
 # Environment variables
 .env
+.env.local
+.env.*.local
+.env.production
+.env.development
+.env.staging
 
 # Uploads
 uploads/
+!uploads/.gitkeep
 
 # Logs
 *.log
 logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Backups
+backups/
+*.archive
+*.archive.gz
+
+# Certificates
+certs/
+*.pem
+*.key
+*.crt
 
 # OS files
 .DS_Store
 Thumbs.db
+desktop.ini
 
 # IDE
 .vscode/
 .idea/
 *.swp
 *.swo
+*~
 
-# Node modules (si ajouté à la racine plus tard)
+# Node modules
 node_modules/
+package-lock.json
+yarn.lock
+
+# Build
+dist/
+build/
+.cache/
+
+# Coverage
+coverage/
+.nyc_output/
+
+# Docker
+.dockerignore
+
+# Temporary
+tmp/
+temp/
+*.tmp
+
+# Test snapshots
+*.test.js.snap

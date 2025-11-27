@@ -1,0 +1,101 @@
+/**
+ * Tests unitaires du service SecurityAlert
+ */
+
+const SecurityAlert = require('../../src/models/SecurityAlert');
+const SecurityAlertService = require('../../src/services/securityAlertService');
+const { connectDatabase, clearDatabase, closeDatabase } = require('../helpers/dbSetup');
+const { createTestUser, createMockRequest } = require('../helpers/testHelpers');
+
+describe('SecurityAlertService', () => {
+  beforeAll(async () => {
+    await connectDatabase();
+  });
+
+  afterAll(async () => {
+    await closeDatabase();
+  });
+
+  beforeEach(async () => {
+    await clearDatabase();
+  });
+
+  describe('logLogin', () => {
+    it('devrait créer une alerte de connexion réussie', async () => {
+      const user = await createTestUser();
+      const req = createMockRequest({
+        headers: {
+          'user-agent': 'Test Browser',
+          'x-forwarded-for': '192.168.1.1'
+        }
+      });
+      
+      const alert = await SecurityAlertService.logLogin(user._id, req, true);
+
+      expect(alert).toBeDefined();
+      expect(alert.user.toString()).toBe(user._id.toString());
+      expect(alert.type).toBe('new_login');
+      expect(alert.severity).toBe('low');
+    });
+
+    it('devrait créer une alerte de connexion échouée', async () => {
+      const user = await createTestUser();
+      const req = createMockRequest({
+        headers: {
+          'user-agent': 'Test Browser'
+        }
+      });
+      
+      const alert = await SecurityAlertService.logLogin(user._id, req, false);
+
+      expect(alert.severity).toBe('medium');
+      expect(alert.details.success).toBe(false);
+    });
+  });
+
+  describe('logPasswordChange', () => {
+    it('devrait créer une alerte de changement de mot de passe', async () => {
+      const user = await createTestUser();
+      const req = createMockRequest({
+        headers: {
+          'user-agent': 'Test Browser'
+        }
+      });
+      
+      const alert = await SecurityAlertService.logPasswordChange(user._id, req);
+
+      expect(alert).toBeDefined();
+      expect(alert.type).toBe('password_change');
+      expect(alert.severity).toBe('high');
+    });
+  });
+
+  describe('getUserAlerts', () => {
+    it('devrait récupérer les alertes d\'un utilisateur', async () => {
+      const user = await createTestUser();
+      const req = createMockRequest();
+      
+      await SecurityAlertService.logLogin(user._id, req, true);
+      await SecurityAlertService.logPasswordChange(user._id, req);
+      
+      const result = await SecurityAlertService.getUserAlerts(user._id);
+      
+      expect(result.alerts).toHaveLength(2);
+      expect(result.total).toBe(2);
+    });
+
+    it('devrait limiter le nombre d\'alertes retournées', async () => {
+      const user = await createTestUser();
+      const req = createMockRequest();
+      
+      for (let i = 0; i < 15; i++) {
+        await SecurityAlertService.logLogin(user._id, req, true);
+      }
+      
+      const result = await SecurityAlertService.getUserAlerts(user._id, { limit: 10 });
+      
+      expect(result.alerts).toHaveLength(10);
+      expect(result.total).toBe(15);
+    });
+  });
+});

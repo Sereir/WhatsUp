@@ -1,0 +1,199 @@
+/**
+ * Tests unitaires du modèle Message
+ */
+
+const mongoose = require('mongoose');
+const Message = require('../../src/models/Message');
+const User = require('../../src/models/User');
+const Conversation = require('../../src/models/Conversation');
+const { connectDatabase, clearDatabase, closeDatabase } = require('../helpers/dbSetup');
+const { createTestUser, createTestUsers, createTestConversation } = require('../helpers/testHelpers');
+
+describe('Message Model', () => {
+  beforeAll(async () => {
+    await connectDatabase();
+  });
+
+  afterAll(async () => {
+    await closeDatabase();
+  });
+
+  beforeEach(async () => {
+    await clearDatabase();
+  });
+
+  describe('Message Creation', () => {
+    it('devrait créer un message texte', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+
+      const messageData = {
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello World',
+        type: 'text'
+      };
+
+      const message = await Message.create(messageData);
+
+      expect(message).toBeDefined();
+      expect(message.sender.toString()).toBe(user1._id.toString());
+      expect(message.conversation.toString()).toBe(conversation._id.toString());
+      expect(message.content).toBe('Hello World');
+      expect(message.type).toBe('text');
+      expect(message.status).toBe('sent');
+      expect(message.isDeleted).toBe(false);
+    });
+
+    it('devrait créer un message image', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+
+      const messageData = {
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Check this image',
+        type: 'image',
+        mediaUrl: '/uploads/test-image.jpg'
+      };
+
+      const message = await Message.create(messageData);
+
+      expect(message.type).toBe('image');
+      expect(message.mediaUrl).toBe('/uploads/test-image.jpg');
+    });
+
+    it('ne devrait pas créer un message sans sender', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+
+      const messageData = {
+        conversation: conversation._id,
+        content: 'Hello World',
+        type: 'text'
+      };
+
+      await expect(Message.create(messageData)).rejects.toThrow();
+    });
+
+    it('ne devrait pas créer un message sans conversation', async () => {
+      const user = await createTestUser();
+
+      const messageData = {
+        sender: user._id,
+        content: 'Hello World',
+        type: 'text'
+      };
+
+      await expect(Message.create(messageData)).rejects.toThrow();
+    });
+  });
+
+  describe('Message Reactions', () => {
+    it('devrait ajouter une réaction', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+      const message = await Message.create({
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello',
+        type: 'text'
+      });
+
+      await message.addReaction(user2._id, '👍');
+
+      expect(message.reactions).toHaveLength(1);
+      expect(message.reactions[0].user.toString()).toBe(user2._id.toString());
+      expect(message.reactions[0].emoji).toBe('👍');
+    });
+
+    it('ne devrait pas ajouter une réaction en double', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+      const message = await Message.create({
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello',
+        type: 'text'
+      });
+
+      await message.addReaction(user2._id, '👍');
+      await message.addReaction(user2._id, '👍');
+
+      expect(message.reactions).toHaveLength(1);
+    });
+
+    it('devrait retirer une réaction', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+      const message = await Message.create({
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello',
+        type: 'text'
+      });
+
+      await message.addReaction(user2._id, '👍');
+      expect(message.reactions).toHaveLength(1);
+
+      await message.removeReaction(user2._id);
+      expect(message.reactions).toHaveLength(0);
+    });
+  });
+
+  describe('Message Status', () => {
+    it('devrait marquer un message comme livré', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+      const message = await Message.create({
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello',
+        type: 'text'
+      });
+
+      await message.markAsDelivered(user2._id);
+
+      expect(message.deliveredTo).toHaveLength(1);
+      expect(message.deliveredTo[0].user.toString()).toBe(user2._id.toString());
+      expect(message.deliveredTo[0].deliveredAt).toBeDefined();
+    });
+
+    it('devrait marquer un message comme lu', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+      const message = await Message.create({
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello',
+        type: 'text'
+      });
+
+      await message.markAsRead(user2._id);
+
+      expect(message.readBy).toHaveLength(1);
+      expect(message.readBy[0].user.toString()).toBe(user2._id.toString());
+      expect(message.readBy[0].readAt).toBeDefined();
+    });
+  });
+
+  describe('Message Deletion', () => {
+    it('devrait marquer un message comme supprimé', async () => {
+      const [user1, user2] = await createTestUsers(2);
+      const conversation = await createTestConversation([user1._id, user2._id]);
+      const message = await Message.create({
+        sender: user1._id,
+        conversation: conversation._id,
+        content: 'Hello',
+        type: 'text'
+      });
+
+      message.isDeleted = true;
+      message.deletedAt = new Date();
+      await message.save();
+
+      expect(message.isDeleted).toBe(true);
+      expect(message.deletedAt).toBeDefined();
+    });
+  });
+});

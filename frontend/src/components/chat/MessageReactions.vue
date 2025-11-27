@@ -74,8 +74,6 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['reactionUpdated'])
-
 const authStore = useAuthStore()
 const showEmojiPicker = ref(false)
 const pickerPosition = ref({ x: 0, y: 0 })
@@ -131,7 +129,6 @@ async function addReaction(emoji) {
     showEmojiPicker.value = false
     await api.post(`/api/messages/${props.message._id}/reaction`, { emoji })
     console.log('✅ Réaction ajoutée:', emoji)
-    emit('reactionUpdated')
   } catch (error) {
     console.error('❌ Erreur ajout réaction:', error.response?.data || error.message)
   }
@@ -145,7 +142,6 @@ async function toggleReaction(emoji) {
     try {
       await api.delete(`/api/messages/${props.message._id}/reaction`, { data: { emoji } })
       console.log('✅ Réaction retirée:', emoji)
-      emit('reactionUpdated')
     } catch (error) {
       console.error('❌ Erreur retrait réaction:', error.response?.data || error.message)
     }
