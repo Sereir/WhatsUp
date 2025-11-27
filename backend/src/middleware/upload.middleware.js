@@ -90,5 +90,6 @@ const uploadGroupAvatar = multer({
 module.exports = {
   uploadAvatar: uploadAvatar.single('avatar'),
   uploadMedia: uploadMedia.single('media'),
-  uploadGroupAvatar: uploadGroupAvatar.single('groupAvatar')
+  uploadGroupAvatar: uploadGroupAvatar.single('groupAvatar'),
+  uploadConversationAvatar: uploadGroupAvatar.single('avatar') // Pour la création de conversation
 };

@@ -10,47 +10,65 @@
       <h2>Paramètres</h2>
     </div>
 
-    <!-- Tabs -->
-    <div class="tabs">
-      <button 
-        v-for="tab in tabs"
-        :key="tab.id"
-        :class="['tab', { active: activeTab === tab.id }]"
-        @click="activeTab = tab.id"
-      >
-        <svg viewBox="0 0 24 24" class="tab-icon">
-          <path :d="tab.icon"/>
-        </svg>
-        <span>{{ tab.label }}</span>
-      </button>
+    <!-- Si c'est un groupe, afficher GroupSettings -->
+    <div v-if="conversation.isGroup" class="p-4">
+      <GroupSettings
+        :conversation="conversation"
+        @updated="$emit('updated')"
+        @left="handleLeft"
+        @deleted="handleDeleted"
+      />
     </div>
 
-    <!-- Content -->
-    <div class="settings-content">
-      <!-- Info Contact/Groupe -->
-      <div v-if="activeTab === 'info'" class="tab-content">
-        <div class="contact-header">
-          <div class="contact-avatar">
-            {{ contact?.name?.[0]?.toUpperCase() || '?' }}
-          </div>
-          <h3>{{ contact?.name || 'Utilisateur' }}</h3>
-          <p class="contact-status">{{ contact?.status || 'En ligne' }}</p>
-        </div>
+    <!-- Sinon, afficher les tabs classiques -->
+    <template v-else>
+      <!-- Tabs -->
+      <div class="tabs">
+        <button 
+          v-for="tab in tabs"
+          :key="tab.id"
+          :class="['tab', { active: activeTab === tab.id }]"
+          @click="activeTab = tab.id"
+        >
+          <svg viewBox="0 0 24 24" class="tab-icon">
+            <path :d="tab.icon"/>
+          </svg>
+          <span>{{ tab.label }}</span>
+        </button>
+      </div>
 
-        <div class="info-section">
-          <div class="info-item">
-            <span class="info-label">Email</span>
-            <span class="info-value">{{ contact?.email || 'N/A' }}</span>
+      <!-- Content -->
+      <div class="settings-content">
+        <!-- Info Contact/Groupe -->
+        <div v-if="activeTab === 'info'" class="tab-content">
+          <div class="contact-header">
+            <img 
+              v-if="contact?.avatar" 
+              :src="`http://localhost:3000${contact.avatar}`" 
+              class="contact-avatar" 
+              style="width: 80px; height: 80px; border-radius: 50%; object-fit: cover;"
+            />
+            <div 
+              v-else 
+              class="contact-avatar" 
+              style="width: 80px; height: 80px; border-radius: 50%; background: var(--primary-color); color: white; display: flex; align-items: center; justify-content: center; font-size: 2rem; font-weight: bold;"
+            >
+              {{ contact?.firstName?.[0]?.toUpperCase() || '?' }}{{ contact?.lastName?.[0]?.toUpperCase() || '' }}
+            </div>
+            <h3>{{ contact?.firstName }} {{ contact?.lastName }}</h3>
+            <p class="contact-status">{{ contact?.status === 'online' ? 'En ligne' : 'Hors ligne' }}</p>
           </div>
-          <div class="info-item">
-            <span class="info-label">Téléphone</span>
-            <span class="info-value">{{ contact?.phone || 'N/A' }}</span>
+
+          <div class="info-section">
+            <div class="info-item">
+              <span class="info-label">Email</span>
+              <span class="info-value">{{ contact?.email || 'N/A' }}</span>
+            </div>
+            <div class="info-item">
+              <span class="info-label">Pseudo</span>
+              <span class="info-value">{{ contact?.username || 'N/A' }}</span>
+            </div>
           </div>
-          <div class="info-item">
-            <span class="info-label">À propos</span>
-            <span class="info-value">{{ contact?.about || 'Pas de description' }}</span>
-          </div>
-        </div>
 
         <div class="danger-zone">
           <button class="action-btn" @click="handleArchive">
@@ -59,7 +77,22 @@
             </svg>
             {{ isArchived ? 'Désarchiver' : 'Archiver' }} la conversation
           </button>
-          <button class="danger-btn" @click="handleBlock">
+          <button 
+            v-if="contactIsBlocked"
+            class="action-btn" 
+            @click="handleUnblock"
+            style="background-color: #10b981; color: white;"
+          >
+            <svg viewBox="0 0 24 24" class="icon">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.42 0-8-3.58-8-8 0-1.85.63-3.55 1.69-4.9l10.21 10.21C14.55 19.37 13.15 20 12 20zm6.31-3.1L7.1 5.69C8.45 4.63 10.15 4 12 4c4.42 0 8 3.58 8 8 0 1.85-.63 3.55-1.69 4.9z"/>
+            </svg>
+            Débloquer le contact
+          </button>
+          <button 
+            v-else
+            class="danger-btn" 
+            @click="handleBlock"
+          >
             <svg viewBox="0 0 24 24" class="icon">
               <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zM4 12c0-4.42 3.58-8 8-8 1.85 0 3.55.63 4.9 1.69L5.69 16.9C4.63 15.55 4 13.85 4 12zm8 8c-1.85 0-3.55-.63-4.9-1.69L18.31 7.1C19.37 8.45 20 10.15 20 12c0 4.42-3.58 8-8 8z"/>
             </svg>
@@ -165,6 +198,7 @@
         </div>
       </div>
     </div>
+    </template>
   </div>
 </template>
 
@@ -172,6 +206,10 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '@/services/api'
 import { useAuthStore } from '@/store/auth'
+import { useRouter } from 'vue-router'
+import GroupSettings from './GroupSettings.vue'
+
+const router = useRouter()
 
 const props = defineProps({
   conversation: {
@@ -184,13 +222,14 @@ const props = defineProps({
   }
 })
 
-const emit = defineEmits(['close', 'scrollToMessage', 'block', 'delete', 'archive'])
+const emit = defineEmits(['close', 'scrollToMessage', 'block', 'delete', 'archive', 'updated'])
 
 const activeTab = ref('info')
 const searchQuery = ref('')
 const searchResults = ref([])
 const allMessages = ref([])
 const userId = ref(null)
+const contactIsBlocked = ref(false)
 
 // Détecter si la conversation est archivée pour cet utilisateur
 const isArchived = computed(() => {
@@ -208,16 +247,6 @@ const tabs = [
     id: 'search', 
     label: 'Rechercher',
     icon: 'M15.5 14h-.79l-.28-.27C15.41 12.59 16 11.11 16 9.5 16 5.91 13.09 3 9.5 3S3 5.91 3 9.5 5.91 16 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z'
-  },
-  { 
-    id: 'media', 
-    label: 'Médias',
-    icon: 'M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z'
-  },
-  { 
-    id: 'files', 
-    label: 'Fichiers',
-    icon: 'M14 2H6c-1.1 0-1.99.9-1.99 2L4 20c0 1.1.89 2 1.99 2H18c1.1 0 2-.9 2-2V8l-6-6zm2 16H8v-2h8v2zm0-4H8v-2h8v2zm-3-5V3.5L18.5 9H13z'
   }
 ]
 
@@ -239,7 +268,24 @@ onMounted(async () => {
   userId.value = authStore.user?._id
   
   await loadMessages()
+  await checkBlockedStatus()
 })
+
+async function checkBlockedStatus() {
+  if (!props.contact?._id) return
+  
+  try {
+    // Vérifier dans les contacts bloqués
+    const res = await api.get('/api/contacts?blocked=true')
+    const blockedContacts = res.data.data?.contacts || []
+    const foundContact = blockedContacts.find(c => c.contact._id === props.contact._id)
+    contactIsBlocked.value = !!foundContact
+    
+    console.log('🔍 Statut bloqué:', contactIsBlocked.value)
+  } catch (error) {
+    console.error('❌ Erreur vérification statut bloqué:', error)
+  }
+}
 
 async function loadMessages() {
   try {
@@ -267,9 +313,8 @@ function scrollToMessage(messageId) {
 }
 
 function highlightText(text) {
-  if (!searchQuery.value || !text) return text
-  const regex = new RegExp(`(${searchQuery.value})`, 'gi')
-  return text.replace(regex, '<mark>$1</mark>')
+  // Retourner le texte tel quel, pas de HTML
+  return text || ''
 }
 
 function formatDate(date) {
@@ -301,9 +346,50 @@ function downloadFile(file) {
   link.click()
 }
 
-function handleBlock() {
-  if (confirm('Voulez-vous vraiment bloquer ce contact ?')) {
-    emit('block', props.contact)
+async function handleBlock() {
+  if (!props.contact?._id) {
+    console.error('❌ ID du contact manquant')
+    return
+  }
+  
+  if (!confirm('Voulez-vous vraiment bloquer ce contact ?')) {
+    return
+  }
+  
+  try {
+    // Bloquer directement avec l'ID de l'utilisateur
+    // Le backend créera automatiquement le contact si nécessaire
+    await api.patch(`/api/contacts/${props.contact._id}/block`)
+    contactIsBlocked.value = true
+    
+    console.log('✅ Contact bloqué avec succès')
+    
+    // Fermer le panneau
+    emit('close')
+  } catch (error) {
+    console.error('❌ Erreur blocage:', error)
+    alert(error.response?.data?.message || 'Erreur lors du blocage')
+  }
+}
+
+async function handleUnblock() {
+  if (!props.contact?._id) {
+    console.error('❌ ID du contact manquant')
+    return
+  }
+  
+  try {
+    // Débloquer directement avec l'ID de l'utilisateur
+    await api.patch(`/api/contacts/${props.contact._id}/unblock`)
+    contactIsBlocked.value = false
+    
+    console.log('✅ Contact débloqué avec succès')
+    
+    // Fermer le panneau
+    emit('close')
+  } catch (error) {
+    console.error('❌ Erreur déblocage:', error)
+    alert(error.response?.data?.message || 'Erreur lors du déblocage')
   }
 }
 
@@ -315,6 +401,17 @@ function handleDeleteConversation() {
   if (confirm('Voulez-vous vraiment supprimer cette conversation ?')) {
     emit('delete', props.conversation)
   }
+}
+
+// Handlers pour GroupSettings
+function handleLeft() {
+  emit('close')
+  router.push('/chat')
+}
+
+function handleDeleted() {
+  emit('close')
+  router.push('/chat')
 }
 </script>
 

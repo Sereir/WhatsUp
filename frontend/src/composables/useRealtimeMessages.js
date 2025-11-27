@@ -103,28 +103,19 @@ export function useRealtimeMessages(selectedConversationId, messages, onNewMessa
     socket.on('message:deleted', (data) => {
       console.log('🗑️ Message supprimé:', data)
       
-      // Toujours supprimer le message de la liste (pour tout le monde ou pour moi)
-      const index = messages.value.findIndex(m => m._id === data.messageId)
-      if (index >= 0) {
-        messages.value.splice(index, 1)
-        console.log('✅ Message retiré de la liste')
-      }
-    })
-
-    // Message supprimé
-    socket.on('message:deleted', (data) => {
-      console.log('🗑️ Message supprimé:', data)
+      const message = messages.value.find(m => m._id === data.messageId)
+      if (!message) return
       
       if (data.deleteForEveryone) {
-        // Supprimer complètement
-        messages.value = messages.value.filter(m => m._id !== data.messageId)
+        // Marquer comme supprimé pour tout le monde
+        message.isDeleted = true
+        message.content = ''
+        console.log('✅ Message marqué comme supprimé pour tout le monde')
       } else {
-        // Marquer comme supprimé pour l'utilisateur
-        const message = messages.value.find(m => m._id === data.messageId)
-        if (message) {
-          message.content = 'Message supprimé'
-          message.deleted = true
-        }
+        // Marquer comme supprimé pour l'utilisateur uniquement
+        message.isDeleted = true
+        message.content = ''
+        console.log('✅ Message marqué comme supprimé pour moi')
       }
     })
 

@@ -3,7 +3,7 @@ const router = express.Router();
 const conversationController = require('../controllers/conversationController');
 const authMiddleware = require('../middleware/auth.middleware');
 const { validate, schemas } = require('../middleware/validation.middleware');
-const { uploadGroupAvatar } = require('../middleware/upload.middleware');
+const { uploadConversationAvatar, uploadGroupAvatar } = require('../middleware/upload.middleware');
 const { isGroup, isMember, isAdmin, hasPermission } = require('../middleware/groupPermissions.middleware');
 
 // Toutes les routes nécessitent l'authentification
@@ -14,7 +14,7 @@ router.use(authMiddleware);
  * @desc    Créer une conversation (one-to-one ou groupe)
  * @access  Private
  */
-router.post('/', validate(schemas.createConversation), conversationController.createConversation);
+router.post('/', uploadConversationAvatar, validate(schemas.createConversation), conversationController.createConversation);
 
 /**
  * @route   GET /api/conversations
@@ -75,6 +75,13 @@ router.patch('/:conversationId/notifications', validate(schemas.updateNotificati
  * @access  Private (admin only)
  */
 router.patch('/:conversationId/group', validate(schemas.updateGroupInfo), conversationController.updateGroupInfo);
+
+/**
+ * @route   GET /api/conversations/:conversationId/members
+ * @desc    Obtenir la liste des membres d'un groupe
+ * @access  Private (member)
+ */
+router.get('/:conversationId/members', isGroup, isMember, conversationController.getGroupMembers);
 
 /**
  * @route   POST /api/conversations/:conversationId/members

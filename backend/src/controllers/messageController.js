@@ -33,6 +33,19 @@ const sendMessage = async (req, res, next) => {
       });
     }
     
+    // Vérifier les permissions de groupe
+    if (conversation.isGroup) {
+      // Si seuls les admins peuvent envoyer des messages
+      if (conversation.groupSettings?.onlyAdminsCanSend) {
+        if (!conversation.isAdmin(userId)) {
+          return res.status(403).json({
+            success: false,
+            message: 'Seuls les administrateurs peuvent envoyer des messages dans ce groupe'
+          });
+        }
+      }
+    }
+    
     // Vérifier qu'il y a soit du contenu, soit un fichier
     const hasContent = content && content.trim().length > 0;
     if (!hasContent && !req.file) {

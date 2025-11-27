@@ -26,6 +26,12 @@ export function useSocket() {
         console.log('✅ Socket connecté:', socketInstance.id)
         isConnected.value = true
         error.value = null
+        
+        // Demander une synchronisation des données manquées
+        const lastSync = localStorage.getItem('lastSyncDate')
+        socketInstance.emit('sync:request', { 
+          lastSyncDate: lastSync || new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString()
+        })
       })
 
       socketInstance.on('disconnect', (reason) => {
@@ -36,6 +42,15 @@ export function useSocket() {
       socketInstance.on('connect_error', (err) => {
         console.error('❌ Erreur connexion socket:', err.message)
         error.value = err.message
+      })
+      
+      // Écouter la réponse de synchronisation
+      socketInstance.on('sync:response', (data) => {
+        console.log('🔄 Synchronisation reçue:', data)
+        localStorage.setItem('lastSyncDate', data.syncDate)
+        
+        // Émettre un événement global pour que les composants puissent réagir
+        window.dispatchEvent(new CustomEvent('socket:synced', { detail: data }))
       })
 
       return socketInstance

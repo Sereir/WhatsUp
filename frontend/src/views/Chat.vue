@@ -41,7 +41,24 @@
             placeholder="Rechercher une conversation..."
             class="input-field flex-1"
           />
-          <button @click="showNewConversation = true" class="btn-primary">+</button>
+          <button
+            @click="$router.push('/contacts')"
+            class="p-2 hover:bg-gray-100 rounded-lg transition"
+            title="Contacts"
+          >
+            <svg viewBox="0 0 24 24" class="w-6 h-6 fill-current text-gray-600">
+              <path d="M16,17V19H2V17S2,13 9,13 16,17 16,17M12.5,7.5A3.5,3.5 0 0,1 9,11A3.5,3.5 0 0,1 5.5,7.5A3.5,3.5 0 0,1 9,4A3.5,3.5 0 0,1 12.5,7.5M15.94,13C16.62,13.75 17,14.71 17,15.94V19H22V17S22,13.37 15.94,13M15,4A3.39,3.39 0 0,0 13.07,4.59A5,5 0 0,1 13.07,10.41A3.39,3.39 0 0,0 15,11A3.5,3.5 0 0,0 18.5,7.5A3.5,3.5 0 0,0 15,4Z"/>
+            </svg>
+          </button>
+          <button
+            @click="$router.push('/create-group')"
+            class="p-2 hover:bg-gray-100 rounded-lg transition"
+            title="Créer un groupe"
+          >
+            <svg viewBox="0 0 24 24" class="w-6 h-6 fill-current text-gray-600">
+              <path d="M16,13C15.71,13 15.38,13 15.03,13.05C16.19,13.89 17,15 17,16.5V19H23V16.5C23,14.17 18.33,13 16,13M8,13C5.67,13 1,14.17 1,16.5V19H15V16.5C15,14.17 10.33,13 8,13M8,11A3,3 0 0,0 11,8A3,3 0 0,0 8,5A3,3 0 0,0 5,8A3,3 0 0,0 8,11M16,11A3,3 0 0,0 19,8A3,3 0 0,0 16,5A3,3 0 0,0 13,8A3,3 0 0,0 16,11Z"/>
+            </svg>
+          </button>
         </div>
       </div>
 
@@ -75,7 +92,7 @@
         </div>
         <div 
           v-for="conv in filteredConversations" 
-          :key="conv._id"
+          :key="`${conv._id}-${conv.lastMessageAt}-${getUnreadCount(conv)}`"
           @click="selectConversation(conv)"
           @contextmenu.prevent="showConvOptions(conv, $event)"
           :class="[
@@ -86,31 +103,44 @@
           <div class="flex items-center gap-3">
             <!-- Avatar -->
             <div class="relative">
+              <!-- Avatar groupe -->
               <img 
-                v-if="conv.contact?.avatar" 
+                v-if="conv.isGroup && conv.groupAvatar" 
+                :src="`http://localhost:3000/${conv.groupAvatar}`" 
+                class="w-12 h-12 rounded-full object-cover" 
+              />
+              <div v-else-if="conv.isGroup" class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                {{ conv.groupName?.[0]?.toUpperCase() || 'G' }}
+              </div>
+              <!-- Avatar contact -->
+              <img 
+                v-else-if="conv.contact?.avatar" 
                 :src="`http://localhost:3000${conv.contact.avatar}`" 
                 class="w-12 h-12 rounded-full object-cover" 
               />
               <div v-else class="w-12 h-12 rounded-full bg-primary flex items-center justify-center text-white font-bold">
                 {{ conv.contact?.firstName?.[0] || '?' }}{{ conv.contact?.lastName?.[0] || '' }}
               </div>
-              <!-- Statut en ligne -->
+              <!-- Statut en ligne (seulement pour contacts) -->
               <div 
-                v-if="conv.contact?.status === 'online'" 
+                v-if="!conv.isGroup && conv.contact?.status === 'online'" 
                 class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"
               ></div>
             </div>
             <!-- Info conversation -->
             <div class="flex-1 min-w-0">
               <div class="flex items-center justify-between mb-1">
-                <p class="font-semibold text-gray-900 truncate">
-                  {{ conv.contact?.username || conv.contact?.firstName || 'Utilisateur' }}
-                </p>
-                <p class="text-xs text-gray-500">{{ formatDate(conv.lastMessageAt) }}</p>
+                <div class="flex items-center gap-2 flex-1 min-w-0">
+                  <p class="font-semibold text-gray-900 truncate">
+                    {{ conv.isGroup ? conv.groupName : (conv.contact?.username || conv.contact?.firstName || 'Utilisateur') }}
+                  </p>
+                  <span v-if="conv.isGroup" class="flex-shrink-0 px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full font-semibold">Groupe</span>
+                </div>
+                <p class="text-xs text-gray-500 flex-shrink-0 ml-2">{{ formatDate(conv.lastMessageAt) }}</p>
               </div>
               <div class="flex items-center gap-2">
                 <p :class="['text-sm truncate flex-1', getUnreadCount(conv) > 0 ? 'font-semibold text-gray-900' : 'text-gray-600']">
-                  {{ conv.lastMessage?.content || 'Aucun message' }}
+                  {{ getLastMessagePreview(conv) }}
                 </p>
                 <!-- Badge notifications non lues -->
                 <NotificationBadge :count="getUnreadCount(conv)" />
@@ -135,20 +165,37 @@
         <!-- Header de la conversation -->
         <div class="bg-secondary p-4 flex items-center justify-between border-b">
           <div class="flex items-center gap-3">
-            <img 
-              v-if="selectedConv.contact?.avatar" 
-              :src="`http://localhost:3000${selectedConv.contact.avatar}`" 
-              class="w-10 h-10 rounded-full object-cover" 
-            />
-            <div v-else class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
-              {{ selectedConv.contact?.firstName?.[0] }}{{ selectedConv.contact?.lastName?.[0] }}
+            <div class="relative">
+              <!-- Avatar groupe -->
+              <img 
+                v-if="selectedConv.isGroup && selectedConv.groupAvatar" 
+                :src="`http://localhost:3000/${selectedConv.groupAvatar}`" 
+                class="w-10 h-10 rounded-full object-cover" 
+              />
+              <div v-else-if="selectedConv.isGroup" class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                {{ selectedConv.groupName?.[0]?.toUpperCase() || 'G' }}
+              </div>
+              <!-- Avatar contact -->
+              <img 
+                v-else-if="selectedConv.contact?.avatar" 
+                :src="`http://localhost:3000${selectedConv.contact.avatar}`" 
+                class="w-10 h-10 rounded-full object-cover" 
+              />
+              <div v-else class="w-10 h-10 rounded-full bg-primary flex items-center justify-center text-white font-bold">
+                {{ selectedConv.contact?.firstName?.[0] }}{{ selectedConv.contact?.lastName?.[0] }}
+              </div>
+              <!-- Puce verte statut en ligne (seulement pour contacts) -->
+              <div 
+                v-if="!selectedConv.isGroup && selectedConv.contact?.status === 'online'" 
+                class="absolute bottom-0 right-0 w-3 h-3 bg-green-500 border-2 border-white rounded-full"
+              ></div>
             </div>
             <div class="text-white">
               <p class="font-semibold">
-                {{ selectedConv.contact?.username || selectedConv.contact?.firstName }}
+                {{ selectedConv.isGroup ? selectedConv.groupName : (selectedConv.contact?.username || selectedConv.contact?.firstName) }}
               </p>
               <p class="text-xs opacity-75">
-                {{ selectedConv.contact?.status === 'online' ? 'En ligne' : 'Hors ligne' }}
+                {{ selectedConv.isGroup ? `${selectedConv.participants?.length || 0} participant(s)` : (selectedConv.contact?.status === 'online' ? 'En ligne' : 'Hors ligne') }}
               </p>
             </div>
           </div>
@@ -171,11 +218,32 @@
           </div>
           
           <div v-for="msg in messages" :key="msg._id" class="mb-4" :data-message-id="msg._id">
-            <div :class="['flex items-start', isOwnMessage(msg) ? 'justify-end' : 'justify-start']">
+            <div :class="['flex items-start gap-2', isOwnMessage(msg) ? 'justify-end' : 'justify-start']">
+              <!-- Avatar dans les groupes (seulement pour les autres) -->
+              <img 
+                v-if="selectedConv.isGroup && !isOwnMessage(msg) && msg.sender?.avatar" 
+                :src="`http://localhost:3000${msg.sender.avatar}`" 
+                :alt="getSenderName(msg)"
+                class="w-8 h-8 rounded-full object-cover mt-1"
+              />
+              <div 
+                v-else-if="selectedConv.isGroup && !isOwnMessage(msg)" 
+                class="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white text-xs font-bold mt-1"
+              >
+                {{ getSenderName(msg)?.[0]?.toUpperCase() }}
+              </div>
+              
               <div 
                 :class="['relative max-w-md rounded-lg p-3 shadow transition-all group', isOwnMessage(msg) ? 'bg-primary text-white' : 'bg-white']"
                 @contextmenu.prevent="!msg.isDeleted && showMessageActions(msg, $event)"
               >
+                <!-- Nom de l'expéditeur dans les groupes -->
+                <p 
+                  v-if="selectedConv.isGroup && !isOwnMessage(msg) && !msg.isDeleted" 
+                  :class="['text-xs font-semibold mb-1', isOwnMessage(msg) ? 'text-white' : 'text-primary']"
+                >
+                  {{ getSenderName(msg) }}
+                </p>
                 <!-- Bouton actions en haut à droite -->
                 <button
                   v-if="!msg.isDeleted"
@@ -366,6 +434,7 @@
       v-if="messageActionsMenu.show"
       :message="messageActionsMenu.message"
       :position="messageActionsMenu.position"
+      :conversation="selectedConv"
       @close="messageActionsMenu.show = false"
       @reply="handleReply"
       @edit="handleEdit"
@@ -388,6 +457,7 @@
             :conversation="selectedConv"
             :contact="selectedConv?.contact"
             @close="showSettings = false"
+            @updated="handleConversationUpdated"
             @scrollToMessage="scrollToMessage"
             @block="handleBlockContact"
             @archive="handleArchiveConversation"
@@ -465,12 +535,18 @@ const filteredConversations = computed(() => {
 
   if (searchQuery.value) {
     const query = searchQuery.value.toLowerCase()
-    filtered = filtered.filter(c => 
-      c.contact?.username?.toLowerCase().includes(query) ||
-      c.contact?.firstName?.toLowerCase().includes(query) ||
-      c.contact?.lastName?.toLowerCase().includes(query) ||
-      c.contact?.email?.toLowerCase().includes(query)
-    )
+    filtered = filtered.filter(c => {
+      // Recherche dans les groupes
+      if (c.isGroup) {
+        return c.groupName?.toLowerCase().includes(query) ||
+               c.groupDescription?.toLowerCase().includes(query)
+      }
+      // Recherche dans les contacts
+      return c.contact?.username?.toLowerCase().includes(query) ||
+             c.contact?.firstName?.toLowerCase().includes(query) ||
+             c.contact?.lastName?.toLowerCase().includes(query) ||
+             c.contact?.email?.toLowerCase().includes(query)
+    })
   }
 
   if (filter.value === 'unread') {
@@ -490,6 +566,12 @@ function isOwnMessage(msg) {
   return senderId?.toString() === userId?.toString()
 }
 
+function getSenderName(msg) {
+  if (!msg || !msg.sender) return 'Inconnu'
+  const sender = msg.sender
+  return sender.username || sender.firstName || sender.email || 'Inconnu'
+}
+
 function formatDate(date) {
   if (!date) return ''
   const d = new Date(date)
@@ -506,6 +588,20 @@ function formatMessageTime(date) {
   if (!date) return ''
   const d = new Date(date)
   return d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
+}
+
+function getLastMessagePreview(conv) {
+  const msg = conv.lastMessage
+  if (!msg) return 'Aucun message'
+  
+  if (msg.isDeleted) return 'Ce message a été supprimé'
+  
+  if (msg.type === 'image' || msg.mimeType?.startsWith('image/')) return '📷 Photo'
+  if (msg.type === 'video' || msg.mimeType?.startsWith('video/')) return '🎥 Vidéo'
+  if (msg.type === 'audio' || msg.mimeType?.startsWith('audio/')) return '🎵 Audio'
+  if (msg.type === 'file' || msg.mediaUrl) return '📎 Fichier'
+  
+  return msg.content || 'Aucun message'
 }
 
 function scrollToBottom() {
@@ -571,6 +667,15 @@ async function loadConversations() {
       setConversations(archivedConvs)
     } else {
       setConversations(activeConvs)
+    }
+    
+    // Rejoindre automatiquement toutes les conversations actives
+    const socket = getSocket()
+    if (socket && socket.connected) {
+      activeConvs.forEach(conv => {
+        socket.emit('conversation:join', conv._id)
+      })
+      console.log(`🔌 Rejoint ${activeConvs.length} conversations automatiquement`)
     }
     
     console.log('✅ Conversations:', activeConvs.length, 'actives,', archivedConvs.length, 'archivées')
@@ -814,6 +919,31 @@ async function handleMessageEdited({ messageId, newContent }) {
   }
 }
 
+async function handleConversationUpdated() {
+  console.log('🔄 Rechargement de la conversation après mise à jour...')
+  try {
+    // Recharger la conversation actuelle
+    if (selectedConv.value?._id) {
+      const res = await api.get(`/api/conversations/${selectedConv.value._id}`)
+      const updatedConv = res.data.data
+      
+      // Mettre à jour selectedConv en conservant le contact
+      selectedConv.value = {
+        ...selectedConv.value,
+        ...updatedConv,
+        contact: selectedConv.value.contact
+      }
+      
+      console.log('✅ Conversation rechargée:', updatedConv)
+    }
+    
+    // Recharger aussi la liste des conversations
+    await loadConversations()
+  } catch (error) {
+    console.error('❌ Erreur rechargement conversation:', error)
+  }
+}
+
 function scrollToMessage(messageId) {
   const messageEl = document.querySelector(`[data-message-id="${messageId}"]`)
   if (messageEl) {
@@ -842,8 +972,10 @@ function getReplyToContent(replyTo) {
   return 'Message'
 }
 
-function handleBlockContact(contact) {
+async function handleBlockContact(contact) {
   console.log('🚫 Bloquer contact:', contact)
+  // Le blocage est géré directement dans ConversationSettings
+  // Cette fonction est appelée pour information seulement
   showSettings.value = false
 }
 
@@ -919,15 +1051,31 @@ watch(() => messageActionsMenu.value.show, (show) => {
 
 onMounted(async () => {
   await loadProfile()
-  await loadConversations()
   
+  // Connecter le socket avant de charger les conversations
   if (authStore.token) {
     connect(authStore.token)
-    setTimeout(() => {
-      setupRealtimeListeners()
-      setupConversationListeners()
-    }, 500)
+    
+    // Attendre que le socket soit connecté
+    const socket = getSocket()
+    if (socket) {
+      // Attendre l'événement de connexion
+      socket.once('connect', () => {
+        console.log('🔌 Socket connecté, configuration des listeners...')
+        setupRealtimeListeners()
+        setupConversationListeners()
+      })
+      
+      // Si déjà connecté
+      if (socket.connected) {
+        setupRealtimeListeners()
+        setupConversationListeners()
+      }
+    }
   }
+  
+  // Charger les conversations après la configuration du socket
+  await loadConversations()
 })
 
 onBeforeUnmount(() => {

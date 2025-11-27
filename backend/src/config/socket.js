@@ -1,6 +1,7 @@
 const { Server } = require('socket.io');
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const Conversation = require('../models/Conversation');
 const ConversationView = require('../models/ConversationView');
 const Message = require('../models/Message');
 const Notification = require('../models/Notification');
@@ -88,6 +89,26 @@ const initializeSocket = (server) => {
         avatar: socket.user.avatar
       }
     });
+    
+    // Rejoindre la room personnelle de l'utilisateur (pour les événements utilisateur)
+    socket.join(`user:${userId}`);
+    
+    // Rejoindre automatiquement toutes les conversations de l'utilisateur
+    (async () => {
+      try {
+        const conversations = await Conversation.find({
+          participants: userId
+        }).select('_id');
+        
+        conversations.forEach(conv => {
+          socket.join(`conversation:${conv._id}`);
+        });
+        
+        logger.info(`User ${userId} a rejoint ${conversations.length} conversations automatiquement`);
+      } catch (error) {
+        logger.error('Erreur auto-join conversations:', error);
+      }
+    })();
     
     // Demander les messages/notifications manqués
     socket.on('sync:request', async ({ lastSyncDate }) => {

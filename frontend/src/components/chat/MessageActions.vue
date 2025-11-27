@@ -100,6 +100,10 @@ const props = defineProps({
   position: {
     type: Object,
     required: true
+  },
+  conversation: {
+    type: Object,
+    default: null
   }
 })
 
@@ -120,7 +124,20 @@ const canEdit = computed(() => {
   return isOwnMessage.value && props.message.content && !props.message.media
 })
 
-const canDelete = computed(() => isOwnMessage.value)
+const canDelete = computed(() => {
+  // Propriétaire du message peut toujours supprimer
+  if (isOwnMessage.value) return true
+  
+  // Dans un groupe, vérifier le rôle
+  if (props.conversation?.isGroup && props.conversation?.memberRoles) {
+    const userId = authStore.user?._id
+    const userRole = props.conversation.memberRoles[userId]
+    // Admins, modérateurs et créateurs peuvent supprimer les messages des autres
+    return ['admin', 'moderator', 'creator'].includes(userRole)
+  }
+  
+  return false
+})
 
 const canDeleteForAll = computed(() => {
   return isOwnMessage.value

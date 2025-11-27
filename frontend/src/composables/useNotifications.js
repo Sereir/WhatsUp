@@ -49,17 +49,6 @@ export function useNotifications() {
   function incrementUnread(conversationId) {
     const conv = conversations.value.find(c => c._id === conversationId)
     if (conv) {
-      if (typeof conv.unreadCount === 'number') {
-        conv.unreadCount++
-      } else {
-        conv.unreadCount = 1
-      }
-    }
-  }
-
-  function resetUnread(conversationId) {
-    const conv = conversations.value.find(c => c._id === conversationId)
-    if (conv) {
       // Récupérer l'ID utilisateur
       let userId = localStorage.getItem('userId') || sessionStorage.getItem('userId')
       
@@ -69,14 +58,48 @@ export function useNotifications() {
       }
       
       if (userId && typeof conv.unreadCount === 'object' && conv.unreadCount !== null) {
-        // Si c'est un objet, mettre à jour seulement pour cet utilisateur
-        conv.unreadCount[userId.toString()] = 0
+        // Si c'est un objet, incrémenter pour cet utilisateur
+        const currentCount = conv.unreadCount[userId.toString()] || 0
+        // Forcer la réactivité en recréant l'objet
+        conv.unreadCount = { ...conv.unreadCount, [userId.toString()]: currentCount + 1 }
+      } else if (typeof conv.unreadCount === 'number') {
+        conv.unreadCount++
       } else {
-        // Sinon mettre à 0 directement
-        conv.unreadCount = 0
+        conv.unreadCount = 1
       }
       
-      console.log('🔔 Notifications réinitialisées pour conversation:', conversationId)
+      console.log('🔔 Notification incrémentée pour conversation:', conversationId, 'nouveau count:', conv.unreadCount)
+    }
+  }
+
+  function resetUnread(conversationId) {
+    const index = conversations.value.findIndex(c => c._id === conversationId)
+    if (index >= 0) {
+      const conv = conversations.value[index]
+      
+      // Récupérer l'ID utilisateur
+      let userId = localStorage.getItem('userId') || sessionStorage.getItem('userId')
+      
+      if (!userId) {
+        const authStore = useAuthStore?.()
+        userId = authStore?.user?._id
+      }
+      
+      // Créer une nouvelle copie de la conversation pour forcer la réactivité
+      const updatedConv = { ...conv }
+      
+      if (userId && typeof conv.unreadCount === 'object' && conv.unreadCount !== null) {
+        // Si c'est un objet, mettre à jour seulement pour cet utilisateur
+        updatedConv.unreadCount = { ...conv.unreadCount, [userId.toString()]: 0 }
+      } else {
+        // Sinon mettre à 0 directement
+        updatedConv.unreadCount = 0
+      }
+      
+      // Remplacer la conversation dans l'array
+      conversations.value.splice(index, 1, updatedConv)
+      
+      console.log('🔔 Notifications réinitialisées pour conversation:', conversationId, 'nouveau count:', updatedConv.unreadCount)
     }
   }
 

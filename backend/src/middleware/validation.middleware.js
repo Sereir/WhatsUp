@@ -91,11 +91,21 @@ const schemas = {
   
   createConversation: Joi.object({
     participantId: Joi.string().optional(),
-    participants: Joi.array().items(Joi.string()).optional(),
-    isGroup: Joi.boolean().optional(),
+    participants: Joi.alternatives().try(
+      Joi.array().items(Joi.string()),
+      Joi.string()
+    ).optional(),
+    isGroup: Joi.alternatives().try(
+      Joi.boolean(),
+      Joi.string().valid('true', 'false')
+    ).optional(),
     groupName: Joi.string().trim().max(100).optional(),
-    groupDescription: Joi.string().max(500).allow('').optional()
-  }),
+    groupDescription: Joi.string().max(500).allow('').optional(),
+    settings: Joi.alternatives().try(
+      Joi.object(),
+      Joi.string()
+    ).optional()
+  }).unknown(true), // Permettre les champs supplémentaires comme avatar
   
   sendMessage: Joi.object({
     conversationId: Joi.string().required()

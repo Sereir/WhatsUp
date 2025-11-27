@@ -1,40 +1,64 @@
 <template>
-  <div class="flex flex-wrap gap-1 mt-1">
+  <div class="flex flex-wrap gap-1 mt-1 relative">
     <!-- Réactions existantes -->
     <button
       v-for="(reaction, idx) in groupedReactions"
       :key="idx"
       @click="toggleReaction(reaction.emoji)"
       :class="[
-        'px-2 py-1 rounded-full text-xs flex items-center gap-1 transition-all',
+        'px-2.5 py-1 rounded-full text-sm flex items-center gap-1.5 transition-all font-medium',
         reaction.hasUserReacted 
-          ? 'bg-primary bg-opacity-20 border border-primary' 
-          : 'bg-gray-100 border border-gray-300 hover:bg-gray-200'
+          ? 'bg-primary bg-opacity-20 border border-primary text-primary' 
+          : 'bg-gray-100 border border-gray-300 hover:bg-gray-200 text-gray-700'
       ]"
     >
-      <span>{{ reaction.emoji }}</span>
-      <span class="font-semibold">{{ reaction.count }}</span>
+      <span class="text-base leading-none">{{ reaction.emoji }}</span>
+      <span class="text-xs font-semibold leading-none">{{ reaction.count }}</span>
     </button>
 
     <!-- Bouton ajouter réaction -->
-    <button
-      @click="showEmojiPicker = !showEmojiPicker"
-      class="px-2 py-1 rounded-full text-xs bg-gray-100 border border-gray-300 hover:bg-gray-200 transition-all"
-    >
-      ➕
-    </button>
-
-    <!-- Picker emojis -->
-    <div v-if="showEmojiPicker" class="absolute z-10 bg-white shadow-lg rounded-lg p-2 flex gap-1 mt-8 border">
+    <div class="relative">
       <button
-        v-for="emoji in quickEmojis"
-        :key="emoji"
-        @click="addReaction(emoji)"
-        class="text-xl hover:bg-gray-100 p-1 rounded"
+        @click="togglePicker"
+        class="px-2.5 py-1 rounded-full text-sm bg-gray-100 border border-gray-300 hover:bg-gray-200 transition-all"
+        title="Ajouter une réaction"
       >
-        {{ emoji }}
+        <span class="text-base leading-none">➕</span>
       </button>
+
+      <!-- Picker emojis -->
+      <Teleport to="body">
+        <div 
+          v-if="showEmojiPicker" 
+          :style="{
+            position: 'fixed',
+            top: pickerPosition.y + 'px',
+            left: pickerPosition.x + 'px',
+            transform: 'translate(-50%, calc(-100% - 8px))'
+          }"
+          class="z-50 bg-white shadow-xl rounded-lg p-2 flex gap-1 border border-gray-200"
+          @click.stop
+          ref="pickerRef"
+        >
+          <button
+            v-for="emoji in quickEmojis"
+            :key="emoji"
+            @click="addReaction(emoji)"
+            class="text-2xl hover:bg-gray-100 p-2 rounded transition-colors"
+            :title="emoji"
+          >
+            {{ emoji }}
+          </button>
+        </div>
+      </Teleport>
     </div>
+    
+    <!-- Overlay pour fermer le picker -->
+    <div 
+      v-if="showEmojiPicker"
+      @click="showEmojiPicker = false"
+      class="fixed inset-0 z-40"
+    ></div>
   </div>
 </template>
 
@@ -54,7 +78,25 @@ const emit = defineEmits(['reactionUpdated'])
 
 const authStore = useAuthStore()
 const showEmojiPicker = ref(false)
+const pickerPosition = ref({ x: 0, y: 0 })
+const pickerRef = ref(null)
 const quickEmojis = ['👍', '❤️', '😂', '😮', '😢', '🙏']
+
+// Calculer la position du picker
+function togglePicker(event) {
+  if (!showEmojiPicker.value) {
+    const button = event.currentTarget
+    const rect = button.getBoundingClientRect()
+    
+    // Positionner au-dessus du bouton, centré
+    pickerPosition.value = {
+      x: rect.left + (rect.width / 2),
+      y: rect.top
+    }
+  }
+  
+  showEmojiPicker.value = !showEmojiPicker.value
+}
 
 const groupedReactions = computed(() => {
   if (!props.message.reactions || props.message.reactions.length === 0) {

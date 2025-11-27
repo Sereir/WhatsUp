@@ -13,15 +13,37 @@ const { emitNotification, emitMemberAdded, emitMemberRemoved, emitMemberRoleChan
  */
 const createConversation = async (req, res, next) => {
   try {
-    const { participantId, participants, isGroup, groupName, groupDescription } = req.body;
+    let { participantId, participants, isGroup, groupName, groupDescription } = req.body;
     const userId = req.user._id;
+    
+    // Convertir isGroup en boolean si c'est une string (venant de FormData)
+    if (typeof isGroup === 'string') {
+      isGroup = isGroup === 'true';
+    }
+    
+    // Convertir participants en array s'il vient comme string unique
+    if (typeof participants === 'string') {
+      participants = [participants];
+    }
+    
+    console.log('📥 Création conversation - body reçu:', {
+      participantId,
+      participants,
+      isGroup,
+      typeof_isGroup: typeof isGroup,
+      typeof_participants: typeof participants,
+      participants_length: participants?.length,
+      groupName,
+      groupDescription,
+      file: req.file ? 'présent' : 'absent'
+    });
     
     if (isGroup) {
       // Créer un groupe
-      if (!participants || participants.length < 2) {
+      if (!participants || participants.length < 1) {
         return res.status(400).json({
           success: false,
-          message: 'Un groupe doit avoir au moins 2 participants en plus du créateur'
+          message: 'Un groupe doit avoir au moins 1 participant en plus du créateur'
         });
       }
       
@@ -42,7 +64,8 @@ const createConversation = async (req, res, next) => {
         memberRoles.set(p.toString(), 'member');
       });
       
-      const conversation = await Conversation.create({
+      // Préparer les données de la conversation
+      const conversationData = {
         participants: allParticipants,
         isGroup: true,
         groupName,
@@ -58,7 +81,14 @@ const createConversation = async (req, res, next) => {
           maxMembers: 256
         },
         unreadCount: Object.fromEntries(allParticipants.map(p => [p.toString(), 0]))
-      });
+      };
+      
+      // Ajouter l'avatar si un fichier a été uploadé
+      if (req.file) {
+        conversationData.groupAvatar = req.file.path.replace(process.cwd(), '').replace(/\\/g, '/');
+      }
+      
+      const conversation = await Conversation.create(conversationData);
       
       await conversation.populate('participants', 'firstName lastName email avatar status');
       await conversation.populate('creator', 'firstName lastName');
@@ -434,6 +464,58 @@ const updateNotificationSettings = async (req, res, next) => {
     
   } catch (error) {
     logger.error('Erreur updateNotificationSettings:', error);
+    next(error);
+  }
+};
+
+/**
+ * Mettre à jour les informations du groupe
+ */
+/**
+ * Obtenir la liste des membres d'un groupe
+ */
+const getGroupMembers = async (req, res, next) => {
+  try {
+    const { conversationId } = req.params;
+    
+    const conversation = await Conversation.findById(conversationId)
+      .populate('participants', 'firstName lastName email avatar status username');
+    
+    if (!conversation) {
+      return res.status(404).json({
+        success: false,
+        message: 'Groupe non trouvé'
+      });
+    }
+    
+    if (!conversation.isGroup) {
+      return res.status(400).json({
+        success: false,
+        message: 'Cette conversation n\'est pas un groupe'
+      });
+    }
+    
+    // Formatter les membres avec leurs rôles
+    const members = conversation.participants.map(participant => ({
+      user: {
+        _id: participant._id,
+        firstName: participant.firstName,
+        lastName: participant.lastName,
+        email: participant.email,
+        avatar: participant.avatar,
+        status: participant.status,
+        username: participant.username
+      },
+      role: conversation.memberRoles?.get(participant._id.toString()) || 'member'
+    }));
+    
+    res.json({
+      success: true,
+      data: members
+    });
+    
+  } catch (error) {
+    logger.error('Erreur getGroupMembers:', error);
     next(error);
   }
 };
@@ -945,6 +1027,7 @@ module.exports = {
   deleteConversation,
   searchConversations,
   updateNotificationSettings,
+  getGroupMembers,
   updateGroupInfo,
   addGroupMember,
   removeGroupMember,

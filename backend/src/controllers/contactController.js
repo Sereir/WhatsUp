@@ -148,16 +148,30 @@ const blockContact = async (req, res, next) => {
     const { contactId } = req.params;
     const userId = req.user._id;
     
-    const contact = await Contact.findOne({
+    let contact = await Contact.findOne({
       user: userId,
       contact: contactId
     });
     
+    // Si le contact n'existe pas, le créer automatiquement
     if (!contact) {
-      return res.status(404).json({
-        success: false,
-        message: 'Contact non trouvé'
+      // Vérifier que l'utilisateur à bloquer existe
+      const userToBlock = await User.findById(contactId);
+      if (!userToBlock) {
+        return res.status(404).json({
+          success: false,
+          message: 'Utilisateur non trouvé'
+        });
+      }
+      
+      // Créer le contact
+      contact = await Contact.create({
+        user: userId,
+        contact: contactId,
+        isBlocked: false
       });
+      
+      logger.info(`Contact créé automatiquement pour blocage: ${req.user.email} -> ${userToBlock.email}`);
     }
     
     if (contact.isBlocked) {

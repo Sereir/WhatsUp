@@ -18,28 +18,43 @@ export function useRealtimeConversations(conversations, loadConversations) {
     socket.on('message:new', (data) => {
       console.log('📨 Nouveau message pour conversation:', data.conversationId)
       
-      const conv = conversations.value.find(c => c._id === data.conversationId)
-      if (conv) {
-        conv.lastMessage = data.message
-        conv.lastMessageAt = data.message.createdAt
+      const index = conversations.value.findIndex(c => c._id === data.conversationId)
+      if (index >= 0) {
+        const conv = conversations.value[index]
         
         // Incrémenter unreadCount si le message n'est pas de l'utilisateur actuel
         const messageFromMe = data.message.sender?._id === authStore.user?._id || 
                               data.message.sender === authStore.user?._id
         
         if (!messageFromMe) {
+          // Incrémenter d'abord (cela va créer une nouvelle référence)
           incrementUnread(data.conversationId)
         }
         
-        // Remonter la conversation en haut de la liste
-        const index = conversations.value.indexOf(conv)
-        if (index > 0) {
-          conversations.value.splice(index, 1)
-          conversations.value.unshift(conv)
+        // Récupérer la conversation à jour après incrementUnread
+        const updatedIndex = conversations.value.findIndex(c => c._id === data.conversationId)
+        if (updatedIndex >= 0) {
+          const currentConv = conversations.value[updatedIndex]
+          
+          // Créer une copie avec le nouveau message
+          const finalConv = {
+            ...currentConv,
+            lastMessage: data.message,
+            lastMessageAt: data.message.createdAt
+          }
+          
+          // Remonter la conversation en haut de la liste
+          conversations.value.splice(updatedIndex, 1)
+          conversations.value.unshift(finalConv)
+          
+          console.log('✅ Conversation mise à jour et remontée en haut')
         }
       } else {
-        // Nouvelle conversation, recharger
-        loadConversations()
+        // Nouvelle conversation détectée, recharger toutes les conversations
+        console.log('🔄 Nouvelle conversation détectée, rechargement...')
+        if (loadConversations) {
+          loadConversations()
+        }
       }
     })
 
@@ -80,6 +95,12 @@ export function useRealtimeConversations(conversations, loadConversations) {
       }
     })
 
+    // Conversation marquée comme lue (autre utilisateur)
+    socket.on('conversation:read', (data) => {
+      console.log('👁️ Conversation marquée comme lue:', data)
+      // Pas besoin de mettre à jour côté client, car resetUnread est déjà appelé localement
+    })
+
     console.log('✅ Listeners conversations configurés')
   }
 
@@ -90,6 +111,7 @@ export function useRealtimeConversations(conversations, loadConversations) {
       socket.off('conversation:updated')
       socket.off('conversation:deleted')
       socket.off('conversation:archived')
+      socket.off('conversation:read')
       console.log('🧹 Listeners conversations nettoyés')
     }
   }

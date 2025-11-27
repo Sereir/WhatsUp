@@ -4,6 +4,8 @@ import Register from '../views/Register.vue'
 import ChooseUsername from '../views/ChooseUsername.vue'
 import UploadAvatar from '../views/UploadAvatar.vue'
 import Chat from '../views/Chat.vue'
+import Contacts from '../views/Contacts.vue'
+import CreateGroup from '../views/CreateGroup.vue'
 import { useAuthStore } from '../store/auth'
 
 const routes = [
@@ -12,7 +14,9 @@ const routes = [
   { path: '/register', component: Register },
   { path: '/choose-username', component: ChooseUsername, meta: { requiresAuth: true } },
   { path: '/upload-avatar', component: UploadAvatar, meta: { requiresAuth: true } },
-  { path: '/chat', component: Chat, meta: { requiresAuth: true } }
+  { path: '/chat', component: Chat, meta: { requiresAuth: true } },
+  { path: '/contacts', component: Contacts, meta: { requiresAuth: true } },
+  { path: '/create-group', component: CreateGroup, meta: { requiresAuth: true } }
 ]
 
 const router = createRouter({
